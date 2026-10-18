@@ -469,6 +469,57 @@
             }
         };
 
+        // === SHIM API GAS untuk hosting luar (GitHub Pages) ===
+        // Jika dibuka di luar Apps Script (tiada google.script.run), semua panggilan
+        // data diterjemahkan secara automatik kepada API JSON GAS — kamera berfungsi
+        // di GitHub Pages kerana tiada iframe GAS menyekatnya.
+        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxIuw3myLP5WzAuHz1IKe1LBJMDR6cZBLgr8ANP6HP1HWS-QMpLZBqh-CH_zrQwngLK/exec';
+        (function installGasShim() {
+            if (typeof google !== 'undefined' && google.script && google.script.run) return; // di dalam GAS — guna asal
+            if (!GAS_API_URL) return;
+            const callApi = (action, args, okFn, failFn) => {
+                try {
+                    // Pastikan rekod objek mempunyai id (supaya id lokal == id pelayan)
+                    if (args && args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]) && !args[0].id && !/^(get|verify)/.test(action) && action !== 'updateRecord' && action !== 'deleteRecord') {
+                        args[0].id = action.replace(/^save|^submit|^record/, '').toLowerCase() + '_' + Date.now();
+                    }
+                    const argsJson = JSON.stringify(args || []);
+                    const qs = '?action=' + encodeURIComponent(action) + '&args=' + encodeURIComponent(argsJson) + '&t=' + Date.now();
+                    if (qs.length < 5500) {
+                        fetch(GAS_API_URL + qs)
+                            .then(r => r.json())
+                            .then(d => {
+                                if (d && d.success) { if (okFn) okFn(d.result); }
+                                else if (failFn) failFn(new Error((d && d.error) || 'API error'));
+                            })
+                            .catch(e => { if (failFn) failFn(e); else if (okFn) okFn(null); });
+                    } else {
+                        // Payload besar (gambar base64): POST no-cors — respons legap tetapi tulisan diproses pelayan
+                        fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: action, args: args }) })
+                            .then(() => setTimeout(() => {
+                                if (okFn) okFn({ success: true, id: (args[0] && args[0].id) || undefined, image: (args[0] && args[0].image) || undefined });
+                            }, 1500))
+                            .catch(e => { if (failFn) failFn(e); else if (okFn) okFn(null); });
+                    }
+                } catch (e) { if (failFn) failFn(e); }
+            };
+            window.google = {
+                script: {
+                    get run() {
+                        let okFn = null, failFn = null;
+                        const runner = new Proxy({}, {
+                            get(t, prop) {
+                                if (prop === 'withSuccessHandler') return (f) => { okFn = f; return runner; };
+                                if (prop === 'withFailureHandler') return (f) => { failFn = f; return runner; };
+                                return (...args) => callApi(prop, args, okFn, failFn);
+                            }
+                        });
+                        return runner;
+                    }
+                }
+            };
+        })();
+
         window.initApp();
 
         // === MOD MALAM (Dark Mode) ===
@@ -3933,7 +3984,8 @@
                                     ${students.map(s => `<option value="${s.id}">${s.name} (${s.dept}) ${enrolledIds.has(String(s.id)) ? '✓' : ''}</option>`).join('')}
                                 </select>
                                 <button onclick="window.captureFace()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera"></i> Tangkap Wajah</button>
-                                <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Pastikan muka menghadap kamera dengan pencahayaan baik.</p>
+                                <button onclick="window.enrollFromPhoto()" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-image"></i> Daftar Wajah Dari Gambar Profil</button>
+                                <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Pastikan muka menghadap kamera dengan pencahayaan baik. Alternatif: gunakan gambar profil yang jelas (wajah menghadap) tanpa kamera.</p>
                             </div>
                         </div>
                     </div>
@@ -5487,7 +5539,10 @@
 
             if (!stream) {
                 if (lastError && (lastError.name === 'NotAllowedError' || lastError.name === 'PermissionDeniedError')) {
-                    throw new Error('Kebenaran kamera ditolak. Sila klik ikon kamera/kunci pada bar alamat browser dan benarkan akses kamera, kemudian cuba semula.');
+                    const isGasFrame = window.location.hostname.includes('google.com') || window.location.hostname.includes('googleusercontent.com');
+                    throw new Error(isGasFrame
+                        ? 'Kamera disekat oleh bingkai Google Apps Script (tiada pop-up kebenaran akan keluar). Sila guna pautan GitHub Pages untuk fungsi kamera: https://nas9270.github.io/surau-dato-tvm-btu/'
+                        : 'Kebenaran kamera ditolak. Sila klik ikon kamera/kunci pada bar alamat browser dan benarkan akses kamera, kemudian cuba semula.');
                 } else if (lastError && lastError.name === 'NotFoundError') {
                     throw new Error('Tiada kamera dikesan pada peranti ini. Sila pastikan kamera disambungkan dan berfungsi.');
                 } else if (lastError && lastError.name === 'NotReadableError') {
@@ -6229,6 +6284,73 @@
             } catch (e) {
                 if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
                 showToast('Ralat kamera: ' + (e.message || e), 'error');
+            }
+        };
+
+        // Simpan cap wajah (dikongsi oleh captureFace & enrollFromPhoto)
+        window.__persistFaceDescriptor = (student, descriptor) => {
+            const formData = { studentId: student.id, name: student.name, dept: student.dept, descriptor: descriptor };
+            const item = { studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(descriptor) };
+            const updLocal = () => {
+                const idx = DB.faceDescriptors.findIndex(d => String(d.studentId) === String(student.id));
+                if (idx !== -1) DB.faceDescriptors[idx] = item; else DB.faceDescriptors.push(item);
+                buildFaceMatcher();
+            };
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result && result.success !== false) {
+                            updLocal();
+                            showToast('Wajah ' + student.name + ' berjaya didaftarkan!', 'success');
+                            stopCamera();
+                            router();
+                        } else {
+                            showToast('Gagal menyimpan wajah.', 'error');
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        showToast('Ralat: ' + (err.message || err), 'error');
+                    })
+                    .saveFaceDescriptor(formData);
+            } else {
+                updLocal();
+                showToast('Wajah ' + student.name + ' berjaya didaftarkan (tempatan)!', 'success');
+                stopCamera();
+                router();
+            }
+        };
+
+        // Daftar wajah terus dari gambar profil pelajar (tanpa kamera)
+        window.enrollFromPhoto = async () => {
+            const studentId = document.getElementById('enroll-student')?.value;
+            if (!studentId) { showToast('Sila pilih pelajar dahulu.', 'error'); return; }
+            const student = DB.students.find(s => String(s.id) === String(studentId));
+            if (!student) { showToast('Rekod pelajar tidak ditemui.', 'error'); return; }
+            if (!student.image) { showToast('Pelajar ini tiada gambar profil. Muat naik gambar dahulu di halaman Pelajar.', 'error'); return; }
+            const statusEl = document.getElementById('enroll-status');
+            try {
+                showToast('Menganalisis gambar profil... sila tunggu.', 'info');
+                if (statusEl) statusEl.textContent = 'Menganalisis gambar profil...';
+                await window.loadFaceModels();
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                await new Promise((res, rej) => {
+                    img.onload = res;
+                    img.onerror = () => rej(new Error('Gambar tidak dapat dimuatkan (semak sambungan internet).'));
+                    img.src = student.image;
+                });
+                const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+                if (!detection) {
+                    if (statusEl) statusEl.textContent = 'Tiada wajah dikesan dalam gambar.';
+                    showToast('Tiada wajah dikesan dalam gambar profil. Guna gambar wajah yang jelas menghadap kamera, atau daftar melalui kamera.', 'error');
+                    return;
+                }
+                window.__persistFaceDescriptor(student, Array.from(detection.descriptor));
+            } catch (e) {
+                if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
+                showToast('Ralat daftar dari gambar: ' + (e.message || e), 'error');
             }
         };
 
