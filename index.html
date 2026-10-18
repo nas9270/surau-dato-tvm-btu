@@ -6271,9 +6271,11 @@
                 studentId: student.id,
                 name: student.name,
                 dept: student.dept,
-                date: program.date,
+                date: new Date().toLocaleDateString('en-CA'), // tarikh SEBENAR imbasan dilakukan (bukan tarikh program)
+                programDate: program.date,                    // tarikh program (rujukan)
                 year: program.year,
-                session: program.session
+                session: program.session,
+                updatedBy: actorName()
             };
 
             // Simpan ke memori serta-merta
@@ -6470,7 +6472,8 @@
                 semester: s.semester,
                 reason: reason,
                 note: note,
-                date: p.date,
+                date: new Date().toLocaleDateString('en-CA'), // tarikh sebenar ditanda oleh admin
+                programDate: p.date,                          // tarikh program (rujukan)
                 year: p.year,
                 session: p.session,
                 markedBy: state.currentUser ? state.currentUser.name : 'Admin',
