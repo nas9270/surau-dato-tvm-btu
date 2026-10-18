@@ -130,7 +130,7 @@
                 background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
                 page-break-after: always; transform: none !important;
             }
-            #printable-report {
+            #printable-report, #printable-individual {
                 position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important;
                 margin: 0 !important; padding: 24px !important; background: white !important;
                 -webkit-print-color-adjust: exact; print-color-adjust: exact;
@@ -140,6 +140,7 @@
             #printable-report canvas { max-width: 100% !important; }
             #printable-report button { display: none !important; }
             .print-header { display: block !important; }
+            #printable-cert, #printable-cert *, #printable-report, #printable-report *, #printable-individual, #printable-individual * { visibility: visible; }
             .no-print { display: none !important; }
             @page { size: A4 portrait; margin: 0; }
         }
@@ -153,6 +154,7 @@
 
     <script>
         const DEPARTMENTS_LIST = ['SPE', 'SFS', 'SFP', 'DEE', 'DIK', 'DOL'];
+        const LOGO_TVM = 'data:image/jpeg;base64,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';
         
         // Pangkalan Data Global
         window.DB = {
@@ -189,7 +191,7 @@
             users: [
                 { id: 'u1', username: 'admin', password: '123', name: 'Admin Surau', role: 'ADMIN' },
                 { id: 'u2', username: 'superadmin', password: 'password', name: 'Super Admin', role: 'SUPER_ADMIN' },
-                { id: 'u3', username: 'guru', password: 'guru123', name: 'Ustaz Ahmad (Guru)', role: 'GURU' }
+                { id: 'u3', username: 'guru', password: 'guru123', name: 'Ustaz Ahmad (Mentor)', role: 'GURU' }
             ],
             departments: DEPARTMENTS_LIST.map((d, i) => ({ id: 'd'+(i+1), name: d })),
             programs: [
@@ -233,14 +235,22 @@
             displayControl: {
                 public: {
                     home: true, programs: true, gallery: true,
-                    students: true, info: true, donate: true, contact: true
+                    students: true, info: true, donate: true, contact: true,
+                    home_programs: true, home_progress: true, home_students: true
                 },
                 admin: {
                     'admin-dashboard': true, 'admin-programs': true, 'admin-takwim': true,
+                    'admin-notifications': true,
                     'admin-attendance': true, 'admin-classes': true, 'admin-students': true,
                     'admin-gallery': true, 'admin-sijil': true, 'admin-reports': true,
                     'admin-announcements': true, 'admin-donations': true, 'admin-feedback': true,
                     'admin-settings': true
+                },
+                // Kawalan akses peranan MENTOR/AJK (dikawal oleh owner di Super Dashboard)
+                guru: {
+                    'admin-programs': true,   // Rekod progres mentor-mentee
+                    'admin-gallery': true,    // Muat naik gambar program
+                    'admin-attendance': false // Imbasan kehadiran (tutup secara lalai)
                 }
             }
         };
@@ -252,6 +262,7 @@
                 const parsed = JSON.parse(savedDC);
                 if (parsed && parsed.public) Object.assign(window.DB.displayControl.public, parsed.public);
                 if (parsed && parsed.admin) Object.assign(window.DB.displayControl.admin, parsed.admin);
+                if (parsed && parsed.guru) Object.assign(window.DB.displayControl.guru, parsed.guru);
             }
             const savedEx = localStorage.getItem('surau_excused');
             if (savedEx) window.DB.excusedAbsences = JSON.parse(savedEx) || [];
@@ -287,6 +298,42 @@
             'admin-promote': 'admin-students'
         };
         window.getAdminPageGroup = (route) => ADMIN_PAGE_GROUP[route] || route;
+
+        // Halaman yang dibenarkan untuk peranan MENTOR/AJK (ikut kawalan owner)
+        window.getGuruAllowed = () => {
+            const def = { 'admin-programs': true, 'admin-gallery': true, 'admin-attendance': false };
+            const g = Object.assign({}, def, (window.DB.displayControl || {}).guru || {});
+            return Object.keys(g).filter(k => g[k] !== false);
+        };
+
+        // Nama pengguna yang membuat kemas kini (untuk jejak audit)
+        const actorName = () => (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Awam (Online)';
+
+        // Kod ringkas pelajar: JABATAN + semester + kelas (cth: DIK1A, DEE6B, SPE3)
+        window.studentCode = (s) => {
+            const semN = parseInt(String(s.semester || '').replace(/\D/g, '')) || '';
+            return String(s.dept || '').toUpperCase() + semN + (s.kelas || '');
+        };
+
+        // Sel nama boleh klik → biodata penuh; kod + telefon di bawah nama
+        window.personCell = (name, opts = {}) => {
+            const st = (DB.students || []).find(x => String(x.name).trim().toLowerCase() === String(name || '').trim().toLowerCase());
+            const kod = st ? window.studentCode(st) : '';
+            const phone = st ? (st.phone || '') : '';
+            const onclick = st
+                ? `window.showStudentBiodata('${st.id}')`
+                : `showToast('${String(name).replace(/'/g, '')} tiada dalam senarai pelajar berdaftar.', 'info')`;
+            const avatar = opts.avatar
+                ? (() => { const img = (st && st.image) || 'https://placehold.co/64x64/059669/ffffff?text=' + encodeURIComponent((name || '?').slice(0, 2)); return `<img src="${img}" class="w-9 h-9 rounded-full object-cover border-2 border-primary-100 flex-shrink-0" onerror="this.src='https://placehold.co/64x64/059669/ffffff?text=?'" loading="lazy">`; })()
+                : '';
+            return `<span class="flex items-center gap-2.5 cursor-pointer group/pc" onclick="${onclick}" title="Klik untuk biodata penuh">
+                ${avatar}
+                <span class="min-w-0">
+                    <span class="block font-bold text-gray-900 group-hover/pc:text-primary-700 transition truncate">${name}</span>
+                    ${(kod || phone) ? `<span class="block text-[10px] text-gray-500 font-semibold">${kod}${kod && phone ? ' · ' : ''}${phone ? '📞 ' + phone : ''}</span>` : ''}
+                </span>
+            </span>`;
+        };
 
         // === PROGRAM MINGGUAN: PEMBANGUNAN MODAL INSAN (PMI) — SETIAP JUMAAT ===
         // Jana tarikh Jumaat dalam sesi & tahun yang dipilih — TERHAD 18 minggu akademik.
@@ -384,6 +431,40 @@
             Chart.defaults.animation = false;
             Chart.defaults.animations = { colors: false, numbers: false };
             Chart.defaults.transitions = { active: { animation: { duration: 0 } }, resize: { animation: { duration: 0 } }, show: { animations: { colors: false, numbers: false } }, hide: { animations: { colors: false, numbers: false } } };
+            Chart.defaults.layout = { padding: { top: 16 } };
+
+            // Plugin ringkas: papar nombor nilai pada setiap bar/pai/doughnut (bacaan mudah)
+            Chart.register({
+                id: 'valueLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    const isRound = chart.config.type === 'pie' || chart.config.type === 'doughnut';
+                    chart.data.datasets.forEach((ds, di) => {
+                        const meta = chart.getDatasetMeta(di);
+                        if (meta.hidden) return;
+                        meta.data.forEach((el, i) => {
+                            const v = ds.data[i];
+                            if (v === 0 || v === null || v === undefined) return;
+                            ctx.save();
+                            ctx.font = 'bold 11px Inter, sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            if (isRound) {
+                                const p = el.tooltipPosition();
+                                ctx.fillStyle = '#ffffff';
+                                ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+                                ctx.lineWidth = 2.5;
+                                ctx.strokeText(v, p.x, p.y);
+                                ctx.fillText(v, p.x, p.y);
+                            } else {
+                                ctx.fillStyle = '#111827';
+                                ctx.fillText(v, el.x, el.y - 9);
+                            }
+                            ctx.restore();
+                        });
+                    });
+                }
+            });
         }
 
         // === PONTENG: pelajar tidak hadir & tidak bersebab 3 minggu PMI berturut-turut ===
@@ -404,6 +485,8 @@
         // Tapis pelajar mengikut sasaran kehadiran program (audience):
         // 'Semua Pelajar'/kosong = semua; 'Sem 1 & Sem 2' = semester berkenaan; 'Jabatan DEE' = jabatan berkenaan
         window.getAudienceStudents = (program, students) => {
+            // Laporan kehadiran untuk PELAJAR sahaja — staf tidak disertakan
+            students = students.filter(s => String(s.dept || '').toUpperCase() !== 'STAF');
             if (!program || !program.audience || program.audience === 'Semua Pelajar') return students;
             const aud = String(program.audience);
             if (aud.startsWith('Jabatan ')) {
@@ -443,6 +526,7 @@
                                 const dc = typeof serverData.displayControl === 'string' ? JSON.parse(serverData.displayControl) : serverData.displayControl;
                                 if (dc && dc.public) Object.assign(window.DB.displayControl.public, dc.public);
                                 if (dc && dc.admin) Object.assign(window.DB.displayControl.admin, dc.admin);
+                                if (dc && dc.guru) Object.assign(window.DB.displayControl.guru, dc.guru);
                             } catch (e) { /* abaikan */ }
                         }
                         // Proses settings dari Sheets (baris pertama sebagai objek tetapan)
@@ -458,7 +542,8 @@
                                 link: s.link || window.DB.settings.link,
                                 directorName: s.directorName || window.DB.settings.directorName,
                                 directorTitle: s.directorTitle || window.DB.settings.directorTitle,
-                                directorOffice: s.directorOffice || window.DB.settings.directorOffice
+                                directorOffice: s.directorOffice || window.DB.settings.directorOffice,
+                                prayerZone: s.prayerZone || window.DB.settings.prayerZone || 'SGR03'
                             };
                         }
                     })
@@ -521,6 +606,46 @@
         })();
 
         window.initApp();
+
+        // === PIL SOLAT SETERUSNYA (kekal di semua halaman — teks pasif, terus boleh dibaca) ===
+        (function initPrayerPill() {
+            const pill = document.createElement('div');
+            pill.id = 'prayer-pill';
+            pill.className = 'fixed bottom-4 right-4 z-[90000] bg-primary-900/95 text-white pl-3 pr-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold border border-white/15 backdrop-blur pointer-events-none select-none';
+            pill.style.display = 'none';
+            pill.setAttribute('aria-live', 'polite');
+            document.body.appendChild(pill);
+
+            window.updatePrayerPill = () => {
+                const times = window.__ptTimes;
+                if (!times) { pill.style.display = 'none'; return; }
+                const toMin = (s) => { const p = String(s || '0:0').split(':'); return parseInt(p[0], 10) * 60 + parseInt(p[1] || 0, 10); };
+                const now = new Date();
+                const nowMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+                const order = [['subuh','Subuh'], ['zohor','Zohor'], ['asar','Asar'], ['maghrib','Maghrib'], ['isyak','Isyak']];
+                let nextName = 'Subuh', nextTime = times.subuh, tomorrow = false;
+                for (const [k, n] of order) {
+                    if (times[k] && toMin(times[k]) > nowMin) { nextName = n; nextTime = times[k]; break; }
+                }
+                if (!order.some(([k]) => times[k] && toMin(times[k]) > nowMin)) tomorrow = true;
+                // Kira baki masa
+                const target = new Date();
+                const [hh, mm] = String(nextTime || '0:0').split(':');
+                target.setHours(parseInt(hh, 10), parseInt(mm || 0, 10), 0, 0);
+                if (tomorrow) target.setDate(target.getDate() + 1);
+                let diff = Math.max(0, Math.floor((target - now) / 1000));
+                const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
+                pill.innerHTML = `<i class="fas fa-moon text-emerald-300"></i> Solat seterusnya: <span class="text-emerald-300">${nextName} ${nextTime || ''}</span><span class="text-white/70 font-semibold">-${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</span>`;
+                pill.style.display = 'flex';
+            };
+
+            setInterval(window.updatePrayerPill, 1000);
+            // Muat waktu solat selepas SEMUA fungsi siap ditakrifkan & kemas kini setiap jam (auto hari baharu)
+            window.addEventListener('load', () => {
+                window.loadPrayerTimes();
+                setInterval(() => window.loadPrayerTimes(), 3600000);
+            });
+        })();
 
         // === MOD MALAM (Dark Mode) ===
         // Terapkan tema tersimpan serta-merta (elak "flash" terang)
@@ -680,6 +805,10 @@
                             if (result && result.success) {
                                 DB[collection] = DB[collection].filter(item => item.id !== id);
                                 showToast('Rekod berjaya dipadam!', 'success');
+                            } else if (result && result.error === 'not_found') {
+                                // Rekod hanya wujud di tempatan (cth: data contoh) — padam dari paparan sahaja
+                                DB[collection] = DB[collection].filter(item => item.id !== id);
+                                showToast('Rekod dipadam dari paparan (ia tidak wujud dalam Sheets).', 'info');
                             } else {
                                 showToast('Gagal memadamkan rekod!', 'error');
                             }
@@ -729,7 +858,30 @@
             router();
         };
 
+        // Tapisan galeri (carian kata kunci/tarikh, tahun, sesi)
+        window.filterGallery = () => {
+            const sEl = document.getElementById('gallery-search');
+            const yEl = document.getElementById('gallery-year');
+            const seEl = document.getElementById('gallery-session');
+            if (sEl) state.gallerySearch = sEl.value;
+            if (yEl) state.galleryYear = yEl.value;
+            if (seEl) state.gallerySession = seEl.value;
+            router();
+        };
+
         // Tapisan pelajar (jabatan, semester, carian)
+        // Buka/tutup kumpulan jabatan & semester (accordion senarai pelajar)
+        window.toggleStudentGroup = (key) => {
+            if (!state.expandedGroups) state.expandedGroups = {};
+            state.expandedGroups[key] = !state.expandedGroups[key];
+            router();
+            // Skrol ke kumpulan yang baru dibuka
+            setTimeout(() => {
+                const btn = document.querySelector(`button[onclick="window.toggleStudentGroup('${key}')"]`);
+                if (btn && state.expandedGroups[key]) btn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        };
+
         window.filterStudents = () => {
             const deptEl = document.getElementById('student-dept-filter');
             const semEl = document.getElementById('student-sem-filter');
@@ -1028,28 +1180,29 @@
             return all[dateKey] || null;
         };
 
-        // === WAKTU SOLAT BINTULU (Zon SRW03, API e-solat JAKIM) ===
+        // === WAKTU SOLAT BINTULU (Zon SWK03, API e-solat JAKIM) ===
         // 1) Cuba melalui backend Apps Script (elak CORS).
         // 2) Jika gagal, cuba fetch terus.
         // 3) Jika masih gagal (tiada internet), guna jadual anggaran.
         window.loadPrayerTimes = async () => {
             const container = document.getElementById('prayer-times');
-            if (!container) return;
-            container.innerHTML = '<div class="text-center text-gray-400 text-sm py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Memuatkan waktu solat...</div>';
+            if (container) container.innerHTML = '<div class="text-center text-gray-400 text-sm py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Memuatkan waktu solat...</div>';
 
             const renderFallback = () => {
-                const fallback = { imsak: '04:40', subuh: '04:50', syuruk: '06:00', zohor: '12:05', asar: '15:20', maghrib: '18:05', isyak: '19:15' };
-                window.renderPrayerTimes(fallback, 'Anggaran');
+                // Anggaran SWK03 Bintulu (jika tiada talian)
+                const fallback = { imsak: '04:53', subuh: '05:03', syuruk: '06:12', zohor: '12:15', asar: '15:32', maghrib: '18:16', isyak: '19:25' };
+                window.renderPrayerTimes(fallback, 'Anggaran (tiada talian)');
             };
 
             // Cuba melalui backend Apps Script
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 try {
+                    const zone = 'SWK03'; // Zon tetap Bintulu
                     const result = await new Promise((resolve, reject) => {
                         google.script.run
                             .withSuccessHandler(resolve)
                             .withFailureHandler(reject)
-                            .getPrayerTimes();
+                            .getPrayerTimes(zone);
                     });
                     if (result && result.success && result.times) {
                         window.renderPrayerTimes(result.times, result.date || 'Hari Ini');
@@ -1058,9 +1211,10 @@
                 } catch (e) { /* teruskan ke fallback seterusnya */ }
             }
 
-            // Cuba fetch terus (mungkin disekat CORS)
+            // Cuba fetch terus (zon tetap SWK03 = Bintulu)
             try {
-                const res = await fetch('https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat&period=today&zone=SRW03');
+                const zone = 'SWK03';
+                const res = await fetch('https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat&period=today&zone=' + zone + '&t=' + Date.now());
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.status === 'OK!' && data.prayerTime && data.prayerTime.length) {
@@ -1069,7 +1223,7 @@
                         window.renderPrayerTimes({
                             imsak: short(t.imsak), subuh: short(t.fajr), syuruk: short(t.syuruk),
                             zohor: short(t.dhuhr), asar: short(t.asr), maghrib: short(t.maghrib), isyak: short(t.isha)
-                        }, t.date || 'Hari Ini');
+                        }, (t.date || 'Hari Ini') + ' · e-Solat JAKIM ' + zone);
                         return;
                     }
                 }
@@ -1079,6 +1233,12 @@
         };
 
         window.renderPrayerTimes = (times, dateLabel) => {
+            // Simpan secara global supaya pil "Solat Seterusnya" berfungsi di SEMUA halaman
+            window.__ptTimes = times;
+            window.__ptLabel = dateLabel || '';
+            window.__ptFetchedAt = Date.now();
+            window.updatePrayerPill && window.updatePrayerPill();
+
             const container = document.getElementById('prayer-times');
             if (!container) return;
             const labels = [
@@ -1392,20 +1552,14 @@
             PublicNavbar: () => `
                 <nav class="glass sticky top-0 z-50 border-b border-gray-200">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
-                        <a href="#home" class="flex items-center gap-2 sm:gap-3">
-                            <div class="w-10 h-10 bg-primary-700 rounded-full flex items-center justify-center text-white font-black text-xl shadow-inner flex-shrink-0">D</div>
-                            <div class="flex items-center">
-                                <img src="TVETMARA BINTULU_PrimaryLogo_Digital_JPEG.jpeg" 
-                                     alt="TVETMARA Bintulu" 
-                                     class="h-7 sm:h-8 max-w-[140px] sm:max-w-[170px] object-contain block" 
-                                     onerror="window.handleLogoError(this)">
-                                <div class="hidden flex-col justify-center leading-none text-left select-none pr-1">
-                                    <span class="font-black text-primary-900 tracking-wider text-xs sm:text-sm">TVET<span class="text-blue-700">MARA</span></span>
-                                    <span class="font-bold text-[8px] text-gray-500 tracking-widest uppercase">BINTULU</span>
-                                </div>
+                        <a href="#home" class="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <div class="w-10 h-10 bg-primary-700 rounded-xl flex items-center justify-center text-white shadow-inner flex-shrink-0"><i class="fas fa-mosque text-lg"></i></div>
+                            <div class="flex flex-col justify-center leading-tight select-none min-w-0">
+                                <span class="font-black text-primary-900 tracking-tight text-sm sm:text-lg whitespace-nowrap">Surau TVM BTU</span>
+                                <span class="text-[8px] sm:text-[10px] font-bold text-gray-500 tracking-wider uppercase truncate">Surau Serambi Ar-Raudhah</span>
                             </div>
-                            <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
-                            <span class="hidden sm:inline font-bold text-sm sm:text-xl text-primary-900 tracking-tight whitespace-nowrap">TVM BTU | Surau DATO</span>
+                            <div class="h-7 w-px bg-gray-300 mx-0.5 sm:mx-1 flex-shrink-0"></div>
+                            <img src="${LOGO_TVM}" alt="TVETMARA Bintulu" class="h-6 sm:h-8 object-contain flex-shrink-0">
                         </a>
                         <div class="hidden lg:flex items-center space-x-1">
                             ${[['home','Utama'],['programs','Program'],['gallery','Galeri'],['students','Senarai Pelajar'],['info','Info Surau'],['donate','Sumbangan'],['contact','Hubungi']]
@@ -1436,7 +1590,7 @@
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div>
                             <div class="flex items-center gap-2 mb-3">
-                                <div class="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-black text-sm">D</div>
+                                <div class="w-8 h-8 bg-primary-600 rounded-xl flex items-center justify-center text-white text-sm"><i class="fas fa-mosque"></i></div>
                                 <h3 class="text-white text-lg font-bold">${DB.settings.surauName}</h3>
                             </div>
                             <p class="text-sm text-gray-400 leading-relaxed">${DB.settings.vision}</p>
@@ -1521,6 +1675,7 @@
                             <span class="bg-black/30 backdrop-blur-sm text-emerald-200 text-xs font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full border border-emerald-400/30 inline-block mb-4 shadow-sm">
                                 Portal Rasmi Surau DATO
                             </span>
+                            <p class="text-emerald-200 font-bold tracking-widest uppercase text-xs sm:text-sm mb-3 drop-shadow-sm">Selamat Datang ke</p>
                             <h1 class="text-3xl md:text-5xl font-black mb-4 tracking-tight leading-tight text-white drop-shadow-md">
                                 TVM BTU<br>${DB.settings.surauName}
                             </h1>
@@ -1528,20 +1683,56 @@
                                 ${DB.settings.vision}
                             </p>
                             <div class="flex flex-col sm:flex-row justify-center gap-3 w-full sm:w-auto px-6 sm:px-0">
+                                ${window.isDisplayAllowed('public', 'home_programs') ? `
                                 <a href="#programs" class="bg-white text-primary-900 px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-50 hover:-translate-y-0.5 transition flex items-center justify-center gap-2">
                                     <i class="far fa-calendar-check text-primary-600"></i> Lihat Program
-                                </a>
+                                </a>` : ''}
+                                ${window.isDisplayAllowed('public', 'home_progress') ? `
                                 <a href="#programs" class="bg-emerald-900/90 border border-emerald-400/50 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-950 transition shadow-md flex items-center justify-center gap-2">
                                     <i class="fas fa-book-open text-emerald-300"></i> Program & Progres Mentee
-                                </a>
+                                </a>` : ''}
+                                ${window.isDisplayAllowed('public', 'home_students') ? `
                                 <a href="#students" class="bg-white/15 backdrop-blur-md border border-white/40 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/25 transition shadow-sm flex items-center justify-center gap-2">
                                     <i class="fas fa-user-graduate text-emerald-200"></i> Senarai Pelajar
-                                </a>
+                                </a>` : ''}
+                            </div>
+                            <!-- Droplist pintasan untuk pengguna awam -->
+                            <div class="mt-5 flex justify-center px-6 sm:px-0">
+                                <div class="relative">
+                                    <select onchange="if(this.value) window.location.hash=this.value; this.value='';" class="appearance-none bg-black/25 border border-emerald-300/40 text-emerald-100 text-xs font-bold pl-9 pr-8 py-2.5 rounded-full cursor-pointer hover:bg-black/35 transition backdrop-blur-sm outline-none">
+                                        <option value="" class="text-gray-900">⚡ Pintasan Pantas...</option>
+                                        <option value="programs" class="text-gray-900">Program & Kelas</option>
+                                        <option value="students" class="text-gray-900">Senarai Pelajar</option>
+                                        <option value="gallery" class="text-gray-900">Galeri Aktiviti</option>
+                                        <option value="info" class="text-gray-900">Info Surau</option>
+                                        <option value="donate" class="text-gray-900">Sumbangan</option>
+                                        <option value="contact" class="text-gray-900">Hubungi / Daftar Ahli</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-emerald-200 text-[10px] pointer-events-none"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <main class="max-w-7xl mx-auto px-4 py-10 flex-grow fade-in w-full space-y-10">
+                        <!-- Pengumuman — di atas sekali dalam kandungan utama -->
+                        ${announcements.length > 0 ? `
+                        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-bullhorn text-amber-600"></i>
+                                <h2 class="text-lg font-bold text-gray-900">Pengumuman</h2>
+                            </div>
+                            ${announcements.slice(0, 3).map(a => `
+                                <div class="flex items-start gap-3 py-2 border-b border-amber-100 last:border-0">
+                                    <i class="fas fa-circle text-[6px] text-amber-500 mt-2"></i>
+                                    <div>
+                                        <p class="font-bold text-gray-900 text-sm">${a.title || 'Pengumuman'}</p>
+                                        <p class="text-xs text-gray-600">${a.content || ''}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
 
                         <!-- Slideshow (separuh) + Kalendar (separuh) — susun atur sentiasa stabil -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
@@ -1585,22 +1776,6 @@
                             </div>
                         </div>
 
-                        <!-- Statistik Ringkas -->
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition">
-                                <div class="w-14 h-14 bg-primary-100 text-primary-700 rounded-2xl flex items-center justify-center text-2xl"><i class="fas fa-user-graduate"></i></div>
-                                <div><p class="text-3xl font-black text-gray-900">${totalStudents}</p><p class="text-xs text-gray-500 font-bold uppercase">Pelajar</p></div>
-                            </div>
-                            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition">
-                                <div class="w-14 h-14 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center text-2xl"><i class="fas fa-book-open"></i></div>
-                                <div><p class="text-3xl font-black text-gray-900">${totalProgKelas}</p><p class="text-xs text-gray-500 font-bold uppercase">Program & Kelas</p></div>
-                            </div>
-                            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition">
-                                <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center text-2xl"><i class="fas fa-calendar-alt"></i></div>
-                                <div><p class="text-3xl font-black text-gray-900">${progressListHome}</p><p class="text-xs text-gray-500 font-bold uppercase">Rekod Progres</p></div>
-                            </div>
-                        </div>
-
                         <!-- Countdown Ramadan + Hadis Harian + Waktu Solat + Sumbangan -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div class="rounded-2xl shadow-sm p-6 text-white relative overflow-hidden" style="background: linear-gradient(135deg, #7c2d12 0%, #b45309 60%, #d97706 100%);">
@@ -1641,24 +1816,7 @@
                             </div>
                         </div>
 
-                        <!-- Pengumuman -->
-                        ${announcements.length > 0 ? `
-                        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
-                            <div class="flex items-center gap-2 mb-3">
-                                <i class="fas fa-bullhorn text-amber-600"></i>
-                                <h2 class="text-lg font-bold text-gray-900">Pengumuman</h2>
-                            </div>
-                            ${announcements.slice(0, 3).map(a => `
-                                <div class="flex items-start gap-3 py-2 border-b border-amber-100 last:border-0">
-                                    <i class="fas fa-circle text-[6px] text-amber-500 mt-2"></i>
-                                    <div>
-                                        <p class="font-bold text-gray-900 text-sm">${a.title || 'Pengumuman'}</p>
-                                        <p class="text-xs text-gray-600">${a.content || ''}</p>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        ` : ''}
+
 
                         <!-- Program Terdekat -->
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 lg:p-8">
@@ -1748,7 +1906,8 @@
                             ${(listHtml + classCards) || '<p class="col-span-full text-center text-gray-500 py-12 bg-white rounded-2xl border">Tiada program atau kelas direkodkan untuk sesi ini.</p>'}
                         </div>
 
-                        <!-- Rekod Bacaan Mentor-Mentee (dipindahkan dari halaman Kelas) -->
+                        <!-- Rekod Bacaan Mentor-Mentee — borang hanya untuk pengguna log masuk (guru/mentor/admin), bukan umum -->
+                        ${state.currentUser ? `
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 lg:p-8">
                             <div class="flex items-center justify-between mb-4 border-b pb-4">
                                 <div>
@@ -1757,7 +1916,12 @@
                                     </h2>
                                     <p class="text-xs text-gray-500 mt-1">Mentor atau guru boleh merekodkan perkembangan bacaan mentee bagi setiap sesi pengajian.</p>
                                 </div>
-                            </div>
+                            </div>` : `
+                        <div class="bg-gray-50 rounded-2xl border border-dashed border-gray-300 p-5 flex items-center gap-3">
+                            <i class="fas fa-lock text-gray-400"></i>
+                            <p class="text-xs text-gray-500">Borang kemaskini progres mentee hanya untuk <strong>guru/mentor</strong> yang log masuk. <a href="#login" class="text-primary-700 font-bold hover:underline">Log masuk di sini</a>.</p>
+                        </div>
+                        <div class="hidden">`}
                             <form onsubmit="window.saveProgressForm(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentee / Pelajar</label>
@@ -1813,26 +1977,28 @@
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Mentee (Pelajar)</th>
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Mentor</th>
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Fasi (Guru)</th>
+                                            ${state.currentUser ? `
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Tahap</th>
-                                            <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Pencapaian Terkini</th>
+                                            <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Pencapaian Terkini</th>` : ''}
                                             <th class="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">Tarikh Rekod</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-200 bg-white">
                                         ${progressList.map(p => `
                                             <tr class="hover:bg-gray-50 transition">
-                                                <td class="px-6 py-4 font-bold text-gray-900">${p.mentee}</td>
-                                                <td class="px-6 py-4 text-gray-600"><i class="fas fa-user-tie text-gray-400 mr-1.5"></i>${p.mentor}</td>
+                                                <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
+                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor)}</td>
                                                 <td class="px-6 py-4 text-gray-600"><i class="fas fa-chalkboard-teacher text-gray-400 mr-1.5"></i>${p.fasi || '-'}</td>
+                                                ${state.currentUser ? `
                                                 <td class="px-6 py-4">
                                                     <span class="text-xs px-2.5 py-1 rounded-full font-bold ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">
                                                         ${p.level || 'Al-Quran'}
                                                     </span>
                                                 </td>
-                                                <td class="px-6 py-4 font-black text-primary-700">${p.progress}</td>
+                                                <td class="px-6 py-4 font-black text-primary-700">${p.progress}</td>` : ''}
                                                 <td class="px-6 py-4 text-right text-gray-500 font-medium text-xs">${formatDate(p.lastUpdate)}</td>
                                             </tr>
-                                        `).join('') || '<tr><td colspan="6" class="text-center py-10 text-gray-500 italic bg-gray-50/50">Belum ada rekod progres bagi sesi ini. Gunakan borang di atas untuk memasukkan rekod pertama!</td></tr>'}
+                                        `).join('') || `<tr><td colspan="${state.currentUser ? 6 : 4}" class="text-center py-10 text-gray-500 italic bg-gray-50/50">Belum ada rekod progres bagi sesi ini.</td></tr>`}
                                     </tbody>
                                 </table>
                             </div>
@@ -1970,26 +2136,28 @@
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Mentee (Pelajar)</th>
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Mentor</th>
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Fasi (Guru)</th>
+                                            ${state.currentUser ? `
                                             <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Tahap</th>
-                                            <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Pencapaian Terkini</th>
+                                            <th class="px-6 py-3 text-left font-bold text-gray-500 uppercase text-xs">Pencapaian Terkini</th>` : ''}
                                             <th class="px-6 py-3 text-right font-bold text-gray-500 uppercase text-xs">Tarikh Rekod</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-200 bg-white">
                                         ${progressList.map(p => `
                                             <tr class="hover:bg-gray-50 transition">
-                                                <td class="px-6 py-4 font-bold text-gray-900">${p.mentee}</td>
-                                                <td class="px-6 py-4 text-gray-600"><i class="fas fa-user-tie text-gray-400 mr-1.5"></i>${p.mentor}</td>
+                                                <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
+                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor)}</td>
                                                 <td class="px-6 py-4 text-gray-600"><i class="fas fa-chalkboard-teacher text-gray-400 mr-1.5"></i>${p.fasi || '-'}</td>
+                                                ${state.currentUser ? `
                                                 <td class="px-6 py-4">
                                                     <span class="text-xs px-2.5 py-1 rounded-full font-bold ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">
                                                         ${p.level || 'Al-Quran'}
                                                     </span>
                                                 </td>
-                                                <td class="px-6 py-4 font-black text-primary-700">${p.progress}</td>
+                                                <td class="px-6 py-4 font-black text-primary-700">${p.progress}</td>` : ''}
                                                 <td class="px-6 py-4 text-right text-gray-500 font-medium text-xs">${formatDate(p.lastUpdate)}</td>
                                             </tr>
-                                        `).join('') || '<tr><td colspan="6" class="text-center py-10 text-gray-500 italic bg-gray-50/50">Belum ada rekod progres bagi sesi ini. Gunakan borang di atas untuk memasukkan rekod pertama!</td></tr>'}
+                                        `).join('') || `<tr><td colspan="${state.currentUser ? 6 : 4}" class="text-center py-10 text-gray-500 italic bg-gray-50/50">Belum ada rekod progres bagi sesi ini.</td></tr>`}
                                     </tbody>
                                 </table>
                             </div>
@@ -2032,33 +2200,41 @@
 
                 let html = '';
                 if (deptKeys.length > 0) {
+                    // Runtuh lalai: buka hanya kumpulan yang ditapis/cari; jika tiada tapisan, semua tertutup
+                    if (!state.expandedGroups) state.expandedGroups = {};
+                    const hasFilter = !!(fDept || fSem || fSearch);
                     deptKeys.forEach(dept => {
                         const list = groupedByDept[dept];
                         // Kumpul mengikut semester dalam jabatan
                         let bySem = {};
                         list.forEach(s => { if (!bySem[s.semester]) bySem[s.semester] = []; bySem[s.semester].push(s); });
                         const semKeys = Object.keys(bySem).sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
+                        const deptOpen = hasFilter || !!state.expandedGroups['d_' + dept];
 
                         html += `
-                            <div class="mb-10 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden fade-in">
-                                <div class="flex items-center justify-between px-6 py-4 bg-primary-50/50 border-b border-primary-100">
+                            <div class="mb-6 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden fade-in">
+                                <button onclick="window.toggleStudentGroup('d_${dept}')" class="w-full flex items-center justify-between px-5 sm:px-6 py-4 bg-primary-50/50 hover:bg-primary-100/60 border-b border-primary-100 transition text-left">
                                     <div class="flex items-center gap-3">
                                         <div class="w-2.5 h-7 bg-primary-600 rounded-full"></div>
                                         <div>
-                                            <h2 class="text-lg font-bold text-gray-900 tracking-wide">JABATAN ${dept}</h2>
-                                            <p class="text-xs text-gray-500 font-medium">${list.length} Pelajar</p>
+                                            <h2 class="text-base sm:text-lg font-bold text-gray-900 tracking-wide">JABATAN ${dept}</h2>
+                                            <p class="text-xs text-gray-500 font-medium">${list.length} Pelajar · ${semKeys.length} semester</p>
                                         </div>
                                     </div>
-                                    <span class="text-xs font-bold text-primary-700 hidden sm:block">${semKeys.length} semester</span>
-                                </div>
-                                ${semKeys.map(sem => `
+                                    <i class="fas fa-chevron-${deptOpen ? 'up' : 'down'} text-primary-700"></i>
+                                </button>
+                                <div class="${deptOpen ? '' : 'hidden'}">
+                                ${semKeys.map(sem => {
+                                    const semOpen = hasFilter || !!state.expandedGroups['d_' + dept + '_' + sem];
+                                    return `
                                     <div class="border-b border-gray-100 last:border-0">
-                                        <div class="px-6 py-2.5 bg-gray-50/60 flex items-center gap-2">
+                                        <button onclick="window.toggleStudentGroup('d_${dept}_${sem}')" class="w-full px-5 sm:px-6 py-2.5 bg-gray-50/60 hover:bg-gray-100 flex items-center gap-2 transition text-left">
                                             <i class="fas fa-graduation-cap text-primary-600 text-xs"></i>
                                             <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">${sem}</span>
                                             <span class="text-[10px] text-gray-400 font-bold bg-gray-200 px-2 py-0.5 rounded-full">${bySem[sem].length}</span>
-                                        </div>
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-5">
+                                            <i class="fas fa-chevron-${semOpen ? 'up' : 'down'} text-gray-400 text-xs ml-auto"></i>
+                                        </button>
+                                        <div class="${semOpen ? '' : 'hidden'} grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-5">
                                             ${bySem[sem].map(s => `
                                                 <div class="bg-gray-50/70 border border-gray-200 rounded-xl p-3.5 shadow-sm hover:shadow-md transition flex items-center gap-3 hover:bg-white hover:border-primary-200 group">
                                                     <img src="${s.image || 'https://placehold.co/300x300/10b981/ffffff?text='+encodeURIComponent(s.name.charAt(0))}" 
@@ -2067,12 +2243,17 @@
                                                          title="Klik untuk saiz penuh">
                                                     <div class="min-w-0">
                                                         <h3 class="font-bold text-gray-900 text-xs leading-snug line-clamp-2">${s.name}</h3>
+                                                        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                            <span class="text-[9px] font-black text-primary-800 bg-primary-100 border border-primary-200 px-1.5 py-0.5 rounded tracking-wider">${window.studentCode(s)}</span>
+                                                            ${s.phone ? `<span class="text-[9px] text-gray-500 font-semibold"><i class="fas fa-phone text-[8px] mr-0.5"></i>${s.phone}</span>` : ''}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             `).join('')}
                                         </div>
-                                    </div>
-                                `).join('')}
+                                    </div>`;
+                                }).join('')}
+                                </div>
                             </div>
                         `;
                     });
@@ -2113,8 +2294,9 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="mt-3 text-xs text-gray-500 font-medium">
-                            Menunjukkan <span class="font-bold text-primary-700">${students.length}</span> daripada ${allStudents.length} pelajar
+                        <div class="mt-3 text-xs text-gray-500 font-medium flex items-center gap-2 flex-wrap">
+                            <span>Menunjukkan <span class="font-bold text-primary-700">${students.length}</span> daripada ${allStudents.length} pelajar</span>
+                            ${!(fDept || fSem || fSearch) ? '<span class="text-gray-400">· Tekan jabatan untuk buka senarai, kemudian pilih semester</span>' : ''}
                         </div>
                     </div>
 
@@ -2126,17 +2308,87 @@
                                 <p class="text-sm text-gray-500">${allStudents.length === 0 ? 'Tiada rekod pelajar bagi sesi ini. Sila pilih sesi lain.' : 'Tiada pelajar sepadan dengan tapisan semasa. Cuba ubah tapisan atau reset.'}</p>
                             </div>
                         `}
+                        <!-- Daftar Ahli / Jemaah (di bawah sekali — digunakan sekali sahaja oleh pelajar) -->
+                    <!-- Daftar Ahli / Jemaah — medan 100% sama seperti borang Tambah Pelajar (admin); SEMUA wajib -->
+                    <div class="bg-white rounded-2xl border p-8 shadow-sm mt-8">
+                        <h2 class="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2"><i class="fas fa-user-plus text-primary-600"></i> Daftar Ahli / Jemaah Surau</h2>
+                        <p class="text-xs text-gray-500 mb-5">Semua ruangan <strong>wajib</strong> diisi termasuk gambar. Permohonan akan disemak dan diluluskan oleh admin.</p>
+                        <form onsubmit="window.submitMemberForm(event)" class="space-y-4">
+                            <div><label class="block text-xs font-bold text-gray-700 mb-1">Nama Penuh <span class="text-red-500">*</span></label><input type="text" name="name" class="w-full border rounded-xl p-3 text-sm" placeholder="Nama penuh seperti IC" required></div>
+                            <div><label class="block text-xs font-bold text-gray-700 mb-1">No. Kad Pengenalan <span class="text-red-500">*</span></label><input type="text" name="ic" class="w-full border rounded-xl p-3 text-sm" placeholder="040506-13-1234" required></div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div><label class="block text-xs font-bold text-gray-700 mb-1">No. Telefon <span class="text-red-500">*</span></label><input type="text" name="phone" class="w-full border rounded-xl p-3 text-sm" placeholder="012-3456789" required></div>
+                                <div><label class="block text-xs font-bold text-gray-700 mb-1">Jabatan <span class="text-red-500">*</span></label>
+                                    <select name="dept" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
+                                        <option value="">-- Pilih --</option>
+                                        ${DEPARTMENTS_LIST.map(d => `<option value="${d}">${d}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div><label class="block text-xs font-bold text-gray-700 mb-1">Semester <span class="text-red-500">*</span></label>
+                                    <select name="semester" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
+                                        ${['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6'].map(sm=>`<option value="${sm}">${sm}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div><label class="block text-xs font-bold text-gray-700 mb-1">Kelas / Kumpulan</label>
+                                    <select name="kelas" class="w-full border rounded-xl p-3 text-sm bg-gray-50">
+                                        <option value="">Tiada</option>
+                                        <option value="A">A</option>
+                                        <option value="B">B</option>
+                                        <option value="C">C</option>
+                                    </select>
+                                </div>
+                                <div><label class="block text-xs font-bold text-gray-700 mb-1">Tahap Bacaan <span class="text-red-500">*</span></label>
+                                    <select name="level" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
+                                        <option value="Al-Quran">Al-Quran</option>
+                                        <option value="Iqra'">Iqra'</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Profil <span class="text-red-500">*</span> <span class="font-normal text-gray-400">(wajah jelas menghadap kamera)</span></label>
+                                <div class="flex items-center gap-3">
+                                    <img id="member-photo-preview" class="w-16 h-16 rounded-full object-cover border-2 border-primary-100 hidden">
+                                    <label class="cursor-pointer flex-1 text-center text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border-2 border-dashed border-primary-200 px-4 py-3 rounded-xl transition">
+                                        <i class="fas fa-camera mr-1"></i> Pilih Gambar (wajib)
+                                        <input type="file" name="image" accept="image/*" class="hidden" onchange="window.memberPhotoUpload(this)">
+                                    </label>
+                                </div>
+                                <input type="hidden" id="member-photo-data" value="">
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2"><i class="fas fa-user-check"></i> Hantar Permohonan</button>
+                        </form>
+                    </div>
                     </main>
                     ${Components.Footer()}
                 `;
             },
 
             Gallery: async () => {
-                const list = DB.galleries.filter(g => String(g.year) === String(state.filterYear) && g.session === state.filterSession);
-                let galleryCards = list.map(g => `
+                // LALAI: semua gambar ditunjukkan, susun tarikh terbaru dahulu.
+                // Droplist tahun/sesi & carian tersedia untuk pengguna yang mahu tapis.
+                const fYear = state.galleryYear || '';
+                const fSession = state.gallerySession || '';
+                const fSearch = (state.gallerySearch || '').toLowerCase().trim();
+
+                let list = (DB.galleries || []).filter(g => {
+                    if (fYear && String(g.year) !== String(fYear)) return false;
+                    if (fSession && g.session !== fSession) return false;
+                    if (fSearch) {
+                        const hay = ((g.title || '') + ' ' + (g.date || '') + ' ' + formatDate(g.date)).toLowerCase();
+                        if (!hay.includes(fSearch)) return false;
+                    }
+                    return true;
+                });
+                // Susun: tarikh terbaru dahulu
+                list = [...list].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+                const yearOpts = [...new Set((DB.galleries || []).map(g => String(g.year)).filter(Boolean))].sort().reverse();
+                const galleryCards = list.map(g => `
                     <div class="bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group cursor-pointer">
                         <div class="overflow-hidden h-48 relative">
-                            <img src="${g.url}" onclick="window.viewImage(this.src, '${g.title.replace(/'/g, "\\'")}')" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                            <img src="${g.url}" onclick="window.viewImage(this.src, '${g.title.replace(/'/g, "\\'")}')" class="w-full h-full object-cover group-hover:scale-110 transition duration-500" loading="lazy">
                         </div>
                         <div class="p-4">
                             <p class="text-xs text-primary-600 font-bold mb-1">${formatDate(g.date)}</p>
@@ -2148,13 +2400,40 @@
                     ${Components.PublicNavbar()}
                     <div class="bg-gray-100 border-b py-8">
                         <div class="max-w-7xl mx-auto px-4 flex justify-between items-center flex-wrap gap-4">
-                            <div><h1 class="text-3xl font-black text-gray-900">Galeri Aktiviti</h1><p class="text-gray-600 text-sm mt-1">Rakaman gambar program dan pengimarahan surau.</p></div>
-                            ${window.renderGlobalFilterBar()}
+                            <div><h1 class="text-3xl font-black text-gray-900">Galeri Aktiviti</h1></div>
                         </div>
                     </div>
-                    <main class="max-w-7xl mx-auto px-4 py-10 flex-grow w-full">
+
+                    <!-- Bar carian & tapisan galeri -->
+                    <div class="max-w-7xl mx-auto px-4 pt-6 no-print">
+                        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row gap-3 md:items-center">
+                            <div class="flex-1 relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                                <input type="text" id="gallery-search" placeholder="Cari kata kunci program atau tarikh (cth: PMI atau 2026-10)..." value="${state.gallerySearch || ''}"
+                                       oninput="window.filterGallery()"
+                                       class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                            </div>
+                            <div class="flex gap-3 flex-wrap">
+                                <select id="gallery-year" onchange="window.filterGallery()" class="border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                                    <option value="">Semua Tahun</option>
+                                    ${yearOpts.map(y => `<option value="${y}" ${fYear===y?'selected':''}>${y}</option>`).join('')}
+                                </select>
+                                <select id="gallery-session" onchange="window.filterGallery()" class="border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                                    <option value="">Semua Sesi</option>
+                                    <option value="jan-jun" ${fSession==='jan-jun'?'selected':''}>Jan-Jun</option>
+                                    <option value="julai-dis" ${fSession==='julai-dis'?'selected':''}>Julai-Dis</option>
+                                </select>
+                                <button onclick="state.galleryYear=''; state.gallerySession=''; state.gallerySearch=''; router();" class="border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 transition">
+                                    <i class="fas fa-undo mr-1"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-xs text-gray-500 font-medium">Menunjukkan <span class="font-bold text-primary-700">${list.length}</span> daripada ${(DB.galleries || []).length} gambar</div>
+                    </div>
+
+                    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            ${galleryCards || '<p class="col-span-full text-center py-12 text-gray-500 bg-white rounded-2xl border">Tiada gambar bagi sesi ini.</p>'}
+                            ${galleryCards || `<div class="col-span-full text-center py-16 text-gray-500 bg-white rounded-2xl border"><i class="fas fa-images text-3xl text-gray-300 mb-3"></i><p class="font-bold text-gray-700">Tiada gambar ditemui</p><p class="text-sm text-gray-400 mt-1">Cuba ubah kata kunci atau tapisan.</p></div>`}
                         </div>
                     </main>
                     ${Components.Footer()}
@@ -2314,51 +2593,7 @@
                         </form>
                     </div>
 
-                    <!-- Daftar Ahli / Jemaah (Biodata penuh seperti borang pelajar) -->
-                    <div class="bg-white rounded-2xl border p-8 shadow-sm mt-8">
-                        <h2 class="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2"><i class="fas fa-user-plus text-primary-600"></i> Daftar Ahli / Jemaah Surau</h2>
-                        <p class="text-xs text-gray-500 mb-5">Lengkapkan biodata anda. Permohonan akan disemak dan diluluskan oleh admin.</p>
-                        <form onsubmit="window.submitMemberForm(event)" class="space-y-4">
-                            <div><label class="block text-xs font-bold text-gray-700 mb-1">Nama Penuh</label><input type="text" name="name" class="w-full border rounded-xl p-3 text-sm" placeholder="Nama penuh seperti IC" required></div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div><label class="block text-xs font-bold text-gray-700 mb-1">No. Kad Pengenalan</label><input type="text" name="ic" class="w-full border rounded-xl p-3 text-sm" placeholder="040506-13-1234"></div>
-                                <div><label class="block text-xs font-bold text-gray-700 mb-1">No. Telefon</label><input type="text" name="phone" class="w-full border rounded-xl p-3 text-sm" placeholder="012-3456789" required></div>
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div><label class="block text-xs font-bold text-gray-700 mb-1">Jabatan / Unit</label>
-                                    <select name="dept" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
-                                        <option value="">-- Pilih --</option>
-                                        ${DEPARTMENTS_LIST.map(d => `<option value="${d}">${d}</option>`).join('')}
-                                        <option value="STAF">Staf</option>
-                                        <option value="UMUM">Umum</option>
-                                    </select>
-                                </div>
-                                <div><label class="block text-xs font-bold text-gray-700 mb-1">Semester</label>
-                                    <select name="semester" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
-                                        ${['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6'].map(sm=>`<option value="${sm}">${sm}</option>`).join('')}
-                                    </select>
-                                </div>
-                            </div>
-                            <div><label class="block text-xs font-bold text-gray-700 mb-1">Tahap Bacaan</label>
-                                <select name="level" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
-                                    <option value="Al-Quran">Al-Quran</option>
-                                    <option value="Iqra'">Iqra'</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Profil</label>
-                                <div class="flex items-center gap-3">
-                                    <img id="member-photo-preview" class="w-16 h-16 rounded-full object-cover border-2 border-primary-100 hidden">
-                                    <label class="cursor-pointer flex-1 text-center text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border-2 border-dashed border-primary-200 px-4 py-3 rounded-xl transition">
-                                        <i class="fas fa-camera mr-1"></i> Pilih Gambar (wajah jelas)
-                                        <input type="file" name="image" accept="image/*" class="hidden" onchange="window.memberPhotoUpload(this)">
-                                    </label>
-                                </div>
-                                <input type="hidden" id="member-photo-data" value="">
-                            </div>
-                            <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2"><i class="fas fa-user-check"></i> Hantar Permohonan</button>
-                        </form>
-                    </div>
+
 
                     <!-- Tanya Ustaz (Anonim) -->
                     <div class="bg-white rounded-2xl border p-8 shadow-sm mt-8">
@@ -2437,9 +2672,9 @@
                     <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 fade-in">
                         <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl shadow-xl border border-gray-100">
                             <div class="text-center mb-8">
-                                <div class="w-16 h-16 bg-primary-700 rounded-full flex items-center justify-center text-white text-2xl font-black mx-auto mb-3 shadow-inner">D</div>
+                                <div class="w-16 h-16 bg-primary-700 rounded-2xl flex items-center justify-center text-white text-3xl mx-auto mb-3 shadow-inner"><i class="fas fa-mosque"></i></div>
                                 <h2 class="text-2xl font-black text-gray-900 tracking-tight">Log Masuk Admin</h2>
-                                <p class="text-xs text-gray-500 mt-1">Portal Kawalan Sistem Surau Serambi Ar-Raudhah</p>
+                                <p class="text-xs text-gray-500 mt-1">Portal Kawalan Surau TVM BTU · Surau Serambi Ar-Raudhah</p>
                             </div>
                             <form onsubmit="window.handleLogin(event)" class="space-y-4">
                                 <div>
@@ -2470,6 +2705,7 @@
                 const nav = [
                     { id: 'super-dashboard', label: 'Super Dashboard', icon: 'fa-crown', superAdminOnly: true },
                     { id: 'admin-dashboard', label: 'Dashboard', icon: 'fa-tachometer-alt' },
+                    { id: 'admin-notifications', label: 'Notifikasi', icon: 'fa-bell', badge: (DB.pendingMembers || []).filter(p => p.status === 'Menunggu').length + (DB.questions || []).filter(q => q.status === 'Baru').length + (DB.donations || []).filter(d => (d.status || '').includes('Menunggu')).length },
                     { id: 'admin-programs', label: 'Program & Kelas', icon: 'fa-calendar-alt' },
                     { id: 'admin-takwim', label: 'Takwim', icon: 'fa-calendar-check' },
                     { id: 'admin-attendance', label: 'Kehadiran', icon: 'fa-qrcode' },
@@ -2485,7 +2721,7 @@
                 ];
                 // Tapis item yang hanya untuk SUPER_ADMIN + ikut kawalan paparan owner
                 // (SUPER_ADMIN sentiasa nampak semua menu supaya boleh buka semula halaman yang ditutup)
-                const GURU_ALLOWED = ['admin-attendance', 'admin-programs'];
+                const GURU_ALLOWED = window.getGuruAllowed();
                 const isGuru = (state.currentUser.role || '').toUpperCase() === 'GURU';
                 const visibleNav = nav.filter(n => {
                     if (isGuru) return GURU_ALLOWED.includes(n.id);
@@ -2501,7 +2737,7 @@
                                 <button onclick="document.getElementById('admin-sidebar').classList.toggle('-translate-x-full'); document.getElementById('admin-overlay').classList.toggle('hidden');" class="md:hidden text-gray-400"><i class="fas fa-times text-xl"></i></button>
                             </div>
                             <div class="flex-grow overflow-y-auto p-4 space-y-1">
-                                ${visibleNav.map(n => `<a href="#${n.id}" onclick="window.closeAdminSidebar()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition ${activeTab===n.id?'bg-primary-600 text-white shadow-md font-bold':'text-gray-400 hover:bg-gray-800 hover:text-white'}"><i class="fas ${n.icon} w-5"></i> ${n.label}${n.superAdminOnly?'<i class="fas fa-lock ml-auto text-[10px] opacity-60"></i>':''}</a>`).join('')}
+                                ${visibleNav.map(n => `<a href="#${n.id}" onclick="window.closeAdminSidebar()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition ${activeTab===n.id?'bg-primary-600 text-white shadow-md font-bold':'text-gray-400 hover:bg-gray-800 hover:text-white'}"><i class="fas ${n.icon} w-5"></i> ${n.label}${n.badge ? `<span class="ml-auto bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">${n.badge}</span>` : (n.superAdminOnly?'<i class="fas fa-lock ml-auto text-[10px] opacity-60"></i>':'')}</a>`).join('')}
                             </div>
                             <div class="p-4 border-t border-gray-800">
                                 <div class="px-2 py-1 mb-2 text-xs text-gray-400"><span class="font-bold text-gray-300">${state.currentUser.name}</span> (${state.currentUser.role})</div>
@@ -2538,7 +2774,10 @@
                     { key: 'students', label: 'Senarai Pelajar', icon: 'fa-user-graduate', desc: 'Direktori pelajar awam' },
                     { key: 'info', label: 'Info Surau', icon: 'fa-info-circle', desc: 'Maklumat & latar belakang surau' },
                     { key: 'donate', label: 'Sumbangan', icon: 'fa-hand-holding-heart', desc: 'Borang sumbangan dalam talian' },
-                    { key: 'contact', label: 'Hubungi', icon: 'fa-envelope', desc: 'Borang hubungi & maklum balas' }
+                    { key: 'contact', label: 'Hubungi', icon: 'fa-envelope', desc: 'Borang hubungi & maklum balas' },
+                    { key: 'home_programs', label: 'Shortcut: Lihat Program', icon: 'fa-bolt', desc: 'Butang pintasan di muka hadapan' },
+                    { key: 'home_progress', label: 'Shortcut: Program & Progres', icon: 'fa-bolt', desc: 'Butang pintasan di muka hadapan' },
+                    { key: 'home_students', label: 'Shortcut: Senarai Pelajar', icon: 'fa-bolt', desc: 'Butang pintasan di muka hadapan' }
                 ];
                 const adminPages = [
                     { key: 'admin-dashboard', label: 'Dashboard', icon: 'fa-tachometer-alt', desc: 'Papan pemuka statistik admin' },
@@ -2553,6 +2792,12 @@
                     { key: 'admin-donations', label: 'Sumbangan', icon: 'fa-hand-holding-heart', desc: 'Rekod sumbangan' },
                     { key: 'admin-feedback', label: 'Maklum Balas', icon: 'fa-inbox', desc: 'Peti maklum balas' },
                     { key: 'admin-settings', label: 'Tetapan', icon: 'fa-cog', desc: 'Tetapan maklumat surau' }
+                ];
+
+                const guruPages = [
+                    { key: 'admin-programs', label: 'Program & Kelas', icon: 'fa-book-open', desc: 'Rekod bacaan progres mentor-mentee' },
+                    { key: 'admin-gallery', label: 'Galeri', icon: 'fa-images', desc: 'Muat naik gambar program/aktiviti' },
+                    { key: 'admin-attendance', label: 'Kehadiran', icon: 'fa-qrcode', desc: 'Imbasan wajah & laporan kehadiran' }
                 ];
 
                 const toggleRow = (scope, item) => {
@@ -2613,6 +2858,17 @@
                             </div>
                             <div class="space-y-2.5">${adminPages.map(i => toggleRow('admin', i)).join('')}</div>
                         </div>
+                        <div class="bg-gray-50 rounded-2xl border p-5 lg:col-span-2">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="font-bold text-gray-900 flex items-center gap-2"><i class="fas fa-chalkboard-teacher text-emerald-600"></i> Kawalan Peranan Mentor / AJK</h2>
+                                <div class="flex gap-2">
+                                    <button onclick="window.toggleAllDisplay('guru', true)" class="text-[11px] font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 px-2.5 py-1.5 rounded-lg transition">Buka Semua</button>
+                                    <button onclick="window.toggleAllDisplay('guru', false)" class="text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition">Tutup Semua</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">${guruPages.map(i => toggleRow('guru', i)).join('')}</div>
+                            <p class="text-[11px] text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Akaun berperanan Mentor/AJK hanya nampak halaman yang dibuka di sini. Lalai: rekod progres mentor-mentee & muat naik gambar program.</p>
+                        </div>
                     </div>
 
                     <div class="mt-6 bg-purple-50 border border-purple-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -2621,6 +2877,69 @@
                         <a href="#admin-users" class="flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"><i class="fas fa-users-cog mr-1"></i> Urus Pengguna</a>
                     </div>
                 `, 'super-dashboard');
+            },
+
+            AdminNotifications: async () => {
+                // Hanya admin & superadmin (guru/mentor tidak dibenarkan)
+                const pending = (DB.pendingMembers || []).filter(p => p.status === 'Menunggu');
+                const questions = (DB.questions || []).filter(q => q.status === 'Baru');
+                const donations = (DB.donations || []).filter(d => (d.status || '').includes('Menunggu'));
+                const feedback = (DB.feedback || []).slice(0, 10);
+                const total = pending.length + questions.length + donations.length;
+
+                const section = (icon, color, title, count, link, rows, emptyText) => `
+                    <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                        <div class="p-4 bg-${color}-50 border-b flex justify-between items-center flex-wrap gap-2">
+                            <span class="font-bold text-${color}-800"><i class="fas ${icon} mr-2"></i>${title}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black bg-${color}-600 text-white px-2.5 py-0.5 rounded-full">${count}</span>
+                                <a href="#${link}" class="text-xs font-bold text-${color}-700 hover:underline">Urus <i class="fas fa-arrow-right"></i></a>
+                            </div>
+                        </div>
+                        <div class="divide-y divide-gray-100">${rows || `<p class="p-6 text-center text-sm text-gray-400 italic">${emptyText}</p>`}</div>
+                    </div>`;
+
+                return Views.AdminLayout(`
+                    <h1 class="text-2xl font-black text-gray-900 mb-1 flex items-center gap-2"><i class="fas fa-bell text-amber-500"></i> Notifikasi</h1>
+                    <p class="text-sm text-gray-500 mb-6">Semua perkara yang memerlukan tindakan admin — permohonan ahli, soalan, sumbangan & maklum balas.</p>
+
+                    ${total > 0 ? `
+                    <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-6 flex items-center gap-3">
+                        <i class="fas fa-exclamation-circle text-amber-500 text-xl"></i>
+                        <p class="text-sm font-bold text-amber-800">${total} perkara menunggu tindakan anda.</p>
+                    </div>` : `
+                    <div class="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
+                        <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                        <p class="text-sm font-bold text-green-800">Tiada perkara tertungtung. Semua telah diuruskan. Alhamdulillah!</p>
+                    </div>`}
+
+                    <div class="space-y-6">
+                        ${section('fa-user-plus', 'amber', 'Permohonan Ahli / Jemaah Baharu', pending.length, 'admin-students',
+                            pending.map(p => `<div class="p-4 flex items-center gap-3 flex-wrap">
+                                <div class="flex-grow min-w-0"><p class="font-bold text-sm text-gray-900">${p.name} <span class="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full ml-1">${p.dept}${p.semester ? ' · ' + p.semester : ''}</span></p>
+                                <p class="text-xs text-gray-500 mt-0.5"><i class="far fa-calendar mr-1"></i>${formatDate(p.date)} · ${p.phone || ''}</p></div>
+                                <a href="#admin-students" class="text-xs font-bold bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition flex-shrink-0">Semak & Luluskan</a>
+                            </div>`).join(''), 'Tiada permohonan baharu.')}
+
+                        ${section('fa-question-circle', 'indigo', 'Soalan Tanya Ustaz (Belum Dijawab)', questions.length, 'admin-feedback',
+                            questions.map(q => `<div class="p-4 flex items-center gap-3 flex-wrap">
+                                <p class="text-sm text-gray-800 flex-grow min-w-0"><i class="fas fa-quote-left text-indigo-300 mr-1"></i>${q.question}</p>
+                                <a href="#admin-feedback" class="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition flex-shrink-0">Jawab</a>
+                            </div>`).join(''), 'Tiada soalan baharu.')}
+
+                        ${section('fa-hand-holding-heart', 'green', 'Sumbangan Menunggu Pengesahan', donations.length, 'admin-donations',
+                            donations.map(d => `<div class="p-4 flex items-center gap-3 flex-wrap">
+                                <p class="text-sm text-gray-800 flex-grow min-w-0"><strong>${d.donorName || d.name || 'Tanpa Nama'}</strong> — RM ${parseFloat(d.amount || 0).toFixed(2)} <span class="text-xs text-gray-400">(${formatDate(d.date)})</span></p>
+                                <a href="#admin-donations" class="text-xs font-bold bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition flex-shrink-0">Sahkan</a>
+                            </div>`).join(''), 'Tiada sumbangan menunggu.')}
+
+                        ${section('fa-inbox', 'blue', 'Maklum Balas Terkini', feedback.length, 'admin-feedback',
+                            feedback.map(f => `<div class="p-4">
+                                <p class="text-sm text-gray-800">${f.message || ''}</p>
+                                <p class="text-xs text-gray-400 mt-1"><i class="far fa-user mr-1"></i>${f.name || 'Anonim'} · ${formatDate(f.date)} ${f.time || ''}</p>
+                            </div>`).join(''), 'Tiada maklum balas.')}
+                    </div>
+                `, 'admin-notifications');
             },
 
             AdminDashboard: async () => {
@@ -2979,6 +3298,49 @@
                         </div>
                     </div>
 
+                    <!-- Borang Rekod Progres Mentee — untuk guru/mentor & admin -->
+                    <div class="bg-white rounded-2xl border shadow-sm p-6 mb-8">
+                        <h2 class="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2"><i class="fas fa-pencil-alt text-primary-600"></i> Borang Kemaskini Progres Mentee</h2>
+                        <p class="text-xs text-gray-500 mb-5">Untuk guru/mentor merekodkan perkembangan bacaan mentee.</p>
+                        <form onsubmit="window.saveProgressForm(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentee / Pelajar</label>
+                                <select name="mentee" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                    <option value="">-- Pilih Mentee --</option>
+                                    ${DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession).map(s => `<option value="${s.name}">${s.name} (${s.dept} - ${s.semester})</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentor</label>
+                                <input type="text" name="mentor" placeholder="Nama Mentor / Guru" class="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Nama Fasi / Guru</label>
+                                <input type="text" name="fasi" placeholder="Nama Fasi / Guru (pilihan)" class="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Tahap Bacaan</label>
+                                <select name="level" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                    <option value="Al-Quran">Al-Quran</option>
+                                    <option value="Iqra'">Iqra'</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Progres Bacaan Terkini</label>
+                                <input type="text" name="progress" placeholder="Cth: Juzuk 2 M/S 35 atau Iqra' 4 M/S 10" class="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Tarikh Kelas</label>
+                                <input type="date" name="date" value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                            </div>
+                            <div class="flex items-end">
+                                <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-paper-plane"></i> Hantar Rekod Progres
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
                     <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
                         <div class="p-4 bg-gray-50 border-b font-bold text-gray-800 flex justify-between items-center">
                             <span><i class="fas fa-book-reader mr-2 text-primary-600"></i>Rekod Progres Bacaan Mentee (Mentor-Mentee)</span>
@@ -2999,8 +3361,8 @@
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     ${progress.map(p => `
                                         <tr class="hover:bg-gray-50 transition">
-                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${p.mentee}</td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">${p.mentor}</td>
+                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor)}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
                                             <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}</span></td>
@@ -3011,6 +3373,35 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Laporan Kekerapan Mentor (untuk anugerah) -->
+                    ${(() => {
+                        const counts = {};
+                        progress.forEach(p => { const m = (p.mentor || '').trim(); if (m) counts[m] = (counts[m] || 0) + 1; });
+                        const ranking = Object.keys(counts).map(m => ({ name: m, count: counts[m] })).sort((a, b) => b.count - a.count);
+                        if (!ranking.length) return '';
+                        const max = ranking[0].count;
+                        const medals = ['🥇', '🥈', '🥉'];
+                        return `
+                    <div class="bg-white rounded-2xl border shadow-sm overflow-hidden mt-8">
+                        <div class="p-4 bg-amber-50 border-b font-bold text-amber-800 flex justify-between items-center flex-wrap gap-2">
+                            <span><i class="fas fa-award mr-2"></i>Kekerapan Menjadi Mentor (Untuk Anugerah)</span>
+                            <span class="text-xs text-amber-700 font-bold bg-amber-100 px-2.5 py-0.5 rounded-full">${ranking.length} Mentor</span>
+                        </div>
+                        <div class="divide-y divide-gray-100">
+                            ${ranking.map((r, i) => `
+                                <div class="flex items-center gap-3 px-5 py-3.5">
+                                    <span class="text-xl w-8 text-center flex-shrink-0">${medals[i] || `<span class="text-xs font-black text-gray-400">#${i + 1}</span>`}</span>
+                                    <div class="flex-grow min-w-0">
+                                        <p class="font-bold text-sm text-gray-900 truncate">${r.name}</p>
+                                        <div class="w-full bg-gray-100 rounded-full h-1.5 mt-1.5"><div class="bg-amber-500 h-1.5 rounded-full" style="width:${Math.round(r.count / max * 100)}%"></div></div>
+                                    </div>
+                                    <span class="text-sm font-black text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-lg flex-shrink-0">${r.count} rekod</span>
+                                </div>`).join('')}
+                        </div>
+                        <p class="text-[11px] text-gray-400 px-5 py-3 border-t"><i class="fas fa-info-circle mr-1"></i> Dikira daripada bilangan rekod progres yang disahkan oleh setiap mentor bagi sesi ini.</p>
+                    </div>`;
+                    })()}
                 `, 'admin-programs');
             },
 
@@ -3109,8 +3500,8 @@
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     ${progress.map(p => `
                                         <tr class="hover:bg-gray-50 transition">
-                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${p.mentee}</td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">${p.mentor}</td>
+                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor)}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
                                             <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}</span></td>
@@ -3430,11 +3821,20 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Jenis Sijil</label>
-                                <select id="cert-type" onchange="window.updateCert()" class="w-full border rounded-xl p-3 text-sm bg-gray-50 font-bold">
+                                <select id="cert-type" onchange="window.updateCert(true)" class="w-full border rounded-xl p-3 text-sm bg-gray-50 font-bold">
                                     <option value="khatam">Sijil Pencapaian Khatam Al-Quran</option>
                                     <option value="kehadiran">Sijil Kehadiran Penuh</option>
                                     <option value="penghargaan">Sijil Penghargaan (Mentor/AJK)</option>
+                                    <option value="lain">Lain-lain (Nyatakan sendiri)</option>
                                 </select>
+                            </div>
+                            <div id="cert-custom-title-wrap" class="hidden">
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Tajuk Sijil (Lain-lain) <span class="text-red-500">*</span></label>
+                                <input type="text" id="cert-title-custom" oninput="window.updateCert()" class="w-full border rounded-xl p-3 text-sm font-bold" placeholder="Cth: SIJIL PENYERTAAN PROGRAM ...">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Ayat Perakuan pada Sijil <span class="font-normal text-gray-400">(boleh diedit)</span></label>
+                                <textarea id="cert-desc-custom" rows="3" oninput="window.updateCert()" class="w-full border rounded-xl p-3 text-sm" placeholder="Dengan ini diperakui bahawa..."></textarea>
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Tarikh Sijil</label>
@@ -3659,7 +4059,7 @@
                     </div>
 
                     <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                        <div class="p-4 bg-gray-50 border-b font-bold text-gray-800">Program Lain (Sekali) untuk Imbasan</div>
+                        <div class="p-4 bg-gray-50 border-b font-bold text-gray-800">Program Lain untuk Imbasan</div>
                         <div class="overflow-x-auto w-full">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50/50"><tr><th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Program</th><th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tarikh</th><th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Kehadiran</th><th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Tindakan</th></tr></thead>
@@ -3761,6 +4161,68 @@
                             </div>
                         </div>
 
+                        <!-- Senarai Hadir (klik nama → biodata; susun ikut jabatan & semester) -->
+                        ${(() => {
+                            const att = attended.map(a => {
+                                const st = DB.students.find(s => String(s.id) === String(a.studentId)) || {};
+                                return { ...a, semester: st.semester || a.semester || '', image: st.image || a.image || '' };
+                            });
+                            const semNum = s => parseInt(String(s.semester || '').replace(/\D/g, '')) || 99;
+                            att.sort((x, y) => (semNum(x) - semNum(y)) || String(x.name).localeCompare(String(y.name)));
+                            const groups = [];
+                            DEPARTMENTS_LIST.forEach(d => {
+                                const list = att.filter(a => String(a.dept).toUpperCase() === d);
+                                if (list.length) groups.push({ dept: d, list });
+                            });
+                            const others = att.filter(a => !DEPARTMENTS_LIST.includes(String(a.dept).toUpperCase()));
+                            if (others.length) groups.push({ dept: 'LAIN', list: others });
+                            const showAll = !!window.__attShowAllHadir;
+                            const LIMIT = 10;
+                            let shown = 0;
+                            const rows = groups.map(g => {
+                                const items = g.list.map(a => {
+                                    shown++;
+                                    const hidden = (!showAll && shown > LIMIT) ? 'hidden' : '';
+                                    const kod = window.studentCode(a);
+                                    return `
+                                    <div class="flex items-center gap-3 p-3 hover:bg-green-50/60 transition ${hidden} att-hadir-row">
+                                        <img src="${a.image || 'https://placehold.co/64x64/059669/ffffff?text=' + encodeURIComponent((a.name || '?').slice(0, 2))}" onclick="window.viewImage(this.src, '${(a.name || '').replace(/'/g, "\\'")}')" title="Klik untuk skrin penuh" class="w-10 h-10 rounded-full object-cover border-2 border-green-200 flex-shrink-0 cursor-zoom-in hover:scale-110 transition" onerror="this.src='https://placehold.co/64x64/059669/ffffff?text=?'" loading="lazy">
+                                        <div class="min-w-0 flex-grow cursor-pointer" onclick="window.showStudentBiodata('${a.studentId}')" title="Klik untuk biodata">
+                                            <p class="font-bold text-gray-900 text-sm truncate hover:text-primary-700">${a.name}</p>
+                                            <p class="text-[10px] text-gray-500 font-bold"><span class="bg-green-100 text-green-800 px-1.5 py-0.5 rounded">${kod}</span></p>
+                                        </div>
+                                        <div class="text-right flex-shrink-0">
+                                            <p class="text-xs font-bold text-green-700"><i class="far fa-clock mr-1"></i>${a.time || '-'}</p>
+                                            <p class="text-[10px] text-gray-400">${formatDate(a.date)}</p>
+                                        </div>
+                                    </div>`;
+                                }).join('');
+                                return `
+                                <div class="border-b last:border-0">
+                                    <div class="px-4 py-2.5 bg-gray-50 flex items-center gap-2">
+                                        <span class="bg-gray-900 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-wider">${g.dept}</span>
+                                        <span class="text-xs font-bold text-green-700">${g.list.length} hadir</span>
+                                    </div>
+                                    <div class="divide-y divide-gray-100">${items}</div>
+                                </div>`;
+                            }).join('');
+                            const remaining = att.length - LIMIT;
+                            return `
+                        <div class="bg-white rounded-2xl border shadow-sm overflow-hidden mb-6">
+                            <div class="p-4 bg-green-50 border-b font-bold text-green-800 flex items-center justify-between flex-wrap gap-2">
+                                <span><i class="fas fa-user-check mr-2"></i>Senarai Hadir (${att.length})</span>
+                                <span class="text-[10px] font-semibold text-green-600 uppercase tracking-wider">Susunan: Jabatan · Semester (Sem 1 dahulu)</span>
+                            </div>
+                            ${att.length ? rows : '<p class="py-8 text-center text-gray-400 text-sm italic">Belum ada kehadiran direkodkan.</p>'}
+                            ${att.length > LIMIT ? `
+                            <div class="p-3 text-center border-t bg-gray-50/50">
+                                <button onclick="window.__attShowAllHadir = !window.__attShowAllHadir; router();" class="text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 px-4 py-2 rounded-xl transition">
+                                    ${showAll ? '<i class="fas fa-chevron-up mr-1"></i>Tutup Semula' : `<i class="fas fa-chevron-down mr-1"></i>Lihat Semua (${remaining} lagi)`}
+                                </button>
+                            </div>` : ''}
+                        </div>`;
+                        })()}
+
                         <div class="bg-white rounded-2xl border shadow-sm overflow-hidden mb-6">
                             <div class="p-4 bg-gray-50 border-b font-bold text-gray-800">Ringkasan Mengikut Jabatan</div>
                             <div class="overflow-x-auto w-full">
@@ -3796,7 +4258,7 @@
                                             </div>
                                             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                                                 ${g.list.map(s => {
-                                                    const kod = String(s.dept).toUpperCase() + (parseInt(String(s.semester || '').replace(/\D/g, '')) || '');
+                                                    const kod = window.studentCode(s);
                                                     return `
                                                     <div class="bg-red-50/60 border border-red-100 rounded-xl p-3 text-center transition group relative">
                                                         <div onclick="window.showStudentBiodata('${s.id}')" title="Klik untuk biodata" class="cursor-pointer">
@@ -3884,6 +4346,8 @@
                     }, 150);
                 }
 
+                setTimeout(() => window.renderStudentReport(state.attReportStudent), 120);
+
                 return Views.AdminLayout(`
                     <h1 class="text-2xl font-black text-gray-900 mb-2">Laporan Kehadiran</h1>
                     <p class="text-sm text-gray-500 mb-6">Pilih program untuk melihat ringkasan kehadiran mengikut jabatan.</p>
@@ -3902,6 +4366,33 @@
                     </div>
 
                     ${reportHtml || '<div class="bg-white rounded-2xl border p-16 text-center text-gray-500"><i class="fas fa-file-alt text-4xl text-gray-300 mb-3"></i><p>Sila pilih program di atas untuk menjana laporan.</p></div>'}
+
+                    <!-- Laporan Individu Pelajar -->
+                    <div class="bg-white rounded-2xl border shadow-sm p-6 mt-8">
+                        <div class="flex items-center justify-between flex-wrap gap-3 mb-4 border-b pb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2"><i class="fas fa-id-card text-primary-600"></i> Laporan Individu Pelajar</h2>
+                                <p class="text-xs text-gray-500 mt-0.5">Pilih pelajar untuk melihat rekod kehadiran individu bagi semua program & minggu PMI.</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <select id="att-rep-dept" onchange="state.attRepDept=this.value; state.attRepSem=''; router();" class="border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none sm:w-40">
+                                <option value="">Semua Jabatan</option>
+                                ${DEPARTMENTS_LIST.map(d => `<option value="${d}" ${state.attRepDept===d?'selected':''}>${d}</option>`).join('')}
+                            </select>
+                            <select id="att-rep-sem" onchange="state.attRepSem=this.value; router();" class="border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none sm:w-40">
+                                <option value="">Semua Semester</option>
+                                ${[1,2,3,4,5,6].map(n => `<option value="Sem ${n}" ${state.attRepSem==='Sem '+n?'selected':''}>Sem ${n}</option>`).join('')}
+                            </select>
+                            <select id="att-rep-student" class="flex-grow border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                                <option value="">-- Pilih Pelajar --</option>
+                                ${window.sortStudentsByDept(allStudents.filter(s => (!state.attRepDept || s.dept === state.attRepDept) && (!state.attRepSem || s.semester === state.attRepSem))).map(s => `<option value="${s.id}" ${String(state.attReportStudent)===String(s.id)?'selected':''}>${window.studentCode(s)} — ${s.name}</option>`).join('')}
+                            </select>
+                            <button onclick="window.renderStudentReport(document.getElementById('att-rep-student').value)" class="bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 flex-shrink-0"><i class="fas fa-search"></i> Cari</button>
+                            ${state.attReportStudent ? `<button onclick="window.printStudentReport()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 flex-shrink-0"><i class="fas fa-print"></i> Cetak</button>` : ''}
+                        </div>
+                        <div id="student-report-body"></div>
+                    </div>
                 `, 'admin-attendance-report');
             },
 
@@ -4291,7 +4782,7 @@
                             <div class="bg-gray-50 rounded-2xl p-5 text-left border mb-6 space-y-3 text-xs sm:text-sm text-gray-700 font-medium shadow-inner">
                                 <p class="flex items-start gap-3"><i class="fas fa-user mt-0.5 text-primary-600 w-4"></i> <span><strong>Penerima:</strong><br>${certData.name}</span></p>
                                 <p class="flex items-start gap-3"><i class="fas fa-id-card mt-0.5 text-primary-600 w-4"></i> <span><strong>No K/P:</strong><br>${certData.ic}</span></p>
-                                <p class="flex items-start gap-3"><i class="fas fa-certificate mt-0.5 text-primary-600 w-4"></i> <span><strong>Kategori:</strong><br>${certData.type === 'khatam' ? 'Sijil Pencapaian Khatam Al-Quran' : certData.type === 'kehadiran' ? 'Sijil Kehadiran Penuh' : 'Sijil Penghargaan'}</span></p>
+                                <p class="flex items-start gap-3"><i class="fas fa-certificate mt-0.5 text-primary-600 w-4"></i> <span><strong>Kategori:</strong><br>${certData.title || (certData.type === 'khatam' ? 'Sijil Pencapaian Khatam Al-Quran' : certData.type === 'kehadiran' ? 'Sijil Kehadiran Penuh' : certData.type === 'penghargaan' ? 'Sijil Penghargaan' : 'Lain-lain')}</span></p>
                                 <p class="flex items-start gap-3"><i class="fas fa-calendar-check mt-0.5 text-primary-600 w-4"></i> <span><strong>Tarikh Pengeluaran:</strong><br>${formatDate(certData.date)}</span></p>
                                 <hr class="my-2 border-gray-200">
                                 <p class="text-[11px] text-gray-500 leading-relaxed"><i class="fas fa-university mr-1 text-primary-700"></i> Dikeluarkan secara digital oleh Surau Serambi Ar-Raudhah, TVETMARA Bintulu.</p>
@@ -4455,7 +4946,8 @@
                 desc: form.elements['desc'] ? form.elements['desc'].value : '', 
                 year: state.filterYear, 
                 session: state.filterSession, 
-                status: 'Published' 
+                status: 'Published',
+                updatedBy: actorName()
             };
 
             if(id) {
@@ -4519,6 +5011,15 @@
                                 </select>
                             </div>
                             <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Kelas / Kumpulan <span class="font-normal text-gray-400">(jika ada)</span></label>
+                                <select name="kelas" class="w-full border rounded-xl p-3 text-sm bg-gray-50">
+                                    ${['', 'A', 'B', 'C'].map(k => `<option value="${k}" ${s&&String(s.kelas||'')===k?'selected':''}>${k === '' ? 'Tiada' : k}</option>`).join('')}
+                                </select>
+                                <p class="text-[10px] text-gray-400 mt-0.5">Cth: DIK1A & DIK1B dalam semester sama</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Tahap Bacaan</label>
                                 <select name="level" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
                                     <option value="Al-Quran" ${s&&s.level==="Al-Quran"?'selected':''}>Al-Quran</option>
@@ -4558,6 +5059,7 @@
             const phone = form.elements['phone'].value.trim();
             const dept = form.elements['dept'].value;
             const semester = form.elements['semester'].value;
+            const kelas = form.elements['kelas'] ? form.elements['kelas'].value : '';
             const level = form.elements['level'].value;
             const session = form.elements['session'] ? form.elements['session'].value : state.filterSession;
             const year = form.elements['year'] ? form.elements['year'].value : state.filterYear;
@@ -4588,11 +5090,13 @@
                     phone: phoneNorm, 
                     dept, 
                     semester, 
+                    kelas,
                     level, 
                     year: String(year), 
                     session, 
                     ic,
-                    image: finalImg || ''
+                    image: finalImg || '',
+                    updatedBy: actorName()
                 };
 
                 const hasBackend = typeof google !== 'undefined' && google.script && google.script.run;
@@ -4707,7 +5211,8 @@
                 location: form.elements['location'].value, 
                 year: state.filterYear, 
                 session: state.filterSession, 
-                status: 'Active' 
+                status: 'Active',
+                updatedBy: actorName()
             };
 
             if(id) {
@@ -4744,7 +5249,8 @@
         };
 
         window.saveProgressForm = (e) => {
-            e.preventDefault(); 
+            e.preventDefault();
+            if (!state.currentUser) { showToast('Hanya guru/mentor yang log masuk boleh merekodkan progres.', 'error'); window.location.hash = 'login'; return; } 
             const form = e.target;
             const btn = form.querySelector('button[type="submit"]');
             if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...'; }
@@ -4764,7 +5270,8 @@
                 progress, 
                 date, 
                 year: state.filterYear, 
-                session: state.filterSession 
+                session: state.filterSession,
+                updatedBy: actorName()
             };
 
             if (typeof google === 'undefined' || !google.script || !google.script.run) {
@@ -4849,7 +5356,7 @@
             const hasBackend = typeof google !== 'undefined' && google.script && google.script.run;
 
             const finish = (url) => {
-                const base = { title: form.elements['title'].value, date: form.elements['date'].value, year: state.filterYear, session: state.filterSession };
+                const base = { title: form.elements['title'].value, date: form.elements['date'].value, year: state.filterYear, session: state.filterSession, updatedBy: actorName() };
 
                 if(id) {
                     // EDIT: hantar kunci 'url' (sepadan dengan kolom sheet Galleries).
@@ -4929,7 +5436,7 @@
             window.updateCert();
         };
 
-        window.updateCert = () => {
+        window.updateCert = (typeChanged = false) => {
             const nameInput = document.getElementById('cert-name');
             const name = (nameInput && nameInput.value) ? nameInput.value.toUpperCase() : '[NAMA PENERIMA]';
             document.getElementById('display-name').innerText = name;
@@ -4950,10 +5457,25 @@
                 'penghargaan': { 
                     title: 'SIJIL PENGHARGAAN & BAKTI', 
                     desc: 'Sekalung penghargaan dan terima kasih diucapkan atas khidmat bakti dan sumbangan yang cemerlang sepanjang sesi ini, sama ada sebagai Mentor mahupun Ahli Jawatankuasa.' 
-                } 
+                },
+                'lain': {
+                    title: '',
+                    desc: ''
+                }
             };
-            document.getElementById('display-title').innerText = types[type].title;
-            document.getElementById('display-desc').innerText = types[type].desc;
+            // Lain-lain: tunjuk ruang tajuk khas
+            const customWrap = document.getElementById('cert-custom-title-wrap');
+            if (customWrap) customWrap.classList.toggle('hidden', type !== 'lain');
+            // Bila jenis sijil ditukar, isi semula ayat perakuan lalai (boleh diedit selepas itu)
+            const descTa = document.getElementById('cert-desc-custom');
+            if (descTa && (typeChanged || !descTa.value.trim())) descTa.value = types[type].desc;
+
+            const finalTitle = type === 'lain'
+                ? ((document.getElementById('cert-title-custom')?.value || '').toUpperCase() || 'SIJIL')
+                : types[type].title;
+            const finalDesc = (descTa && descTa.value.trim()) ? descTa.value.trim() : types[type].desc;
+            document.getElementById('display-title').innerText = finalTitle;
+            document.getElementById('display-desc').innerText = finalDesc;
             
             const dateVal = document.getElementById('cert-date').value;
             document.getElementById('display-date').innerText = dateVal ? formatDate(dateVal) : '[Tarikh]';
@@ -4998,15 +5520,24 @@
                 showToast("Sila lengkapkan Nama Penerima dan No Kad Pengenalan sebelum mencetak.", "error");
                 return;
             }
+            if (type === 'lain' && !(document.getElementById('cert-title-custom')?.value || '').trim()) {
+                showToast("Sila nyatakan tajuk sijil untuk jenis Lain-lain.", "error");
+                return;
+            }
+            window.updateCert(); // pastikan paparan terkini sebelum baca teks
 
             if (!DB.certificates) DB.certificates = [];
             const existingIdx = DB.certificates.findIndex(c => c.id === certId);
-            const certData = { id: certId, name: name.toUpperCase(), ic, type, date };
+            const certData = {
+                id: certId, name: name.toUpperCase(), ic, type, date,
+                title: document.getElementById('display-title').innerText,
+                desc: document.getElementById('display-desc').innerText,
+                updatedBy: actorName()
+            };
             if(existingIdx >= 0) DB.certificates[existingIdx] = certData;
             else DB.certificates.push(certData);
 
-            // Pastikan QR & paparan sijil dikemaskini sepenuhnya sebelum cetak
-            window.updateCert();
+            // QR & paparan sudah dikemas kini di atas
             const doPrint = () => setTimeout(() => { window.print(); }, 500);
 
             // Simpan ke Google Sheets supaya boleh disahkan selepas refresh
@@ -5032,13 +5563,21 @@
             const user = e.target.username.value.trim();
             const pass = e.target.password.value.trim();
 
+            // Papar status menunggu supaya pengguna tidak keliru semasa pelayan mengesahkan
+            const btn = document.getElementById('btn-login');
+            const btnLabel = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengesahkan... sila tunggu sebentar'; }
+            showToast('Sedang mengesahkan log masuk, sila tunggu...', 'info');
+            const resetBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = btnLabel; } };
+
             const doLoginSuccess = (found) => {
+                resetBtn();
                 if (found) {
                     state.currentUser = found;
                     showToast(`Selamat datang, ${found.name || found.username}!`, 'success');
-                    // Owner (SUPER_ADMIN) terus ke Super Dashboard; Guru terus ke Kehadiran
+                    // Owner (SUPER_ADMIN) terus ke Super Dashboard; Guru terus ke halaman pertama yang dibenarkan
                     const roleUp = (found.role || '').toUpperCase();
-                    window.location.hash = roleUp === 'SUPER_ADMIN' ? 'super-dashboard' : roleUp === 'GURU' ? 'admin-attendance' : 'admin-dashboard';
+                    window.location.hash = roleUp === 'SUPER_ADMIN' ? 'super-dashboard' : roleUp === 'GURU' ? (window.getGuruAllowed()[0] || 'home') : 'admin-dashboard';
                 } else {
                     showToast('Nama pengguna atau kata laluan tidak sah!', 'error');
                 }
@@ -5049,6 +5588,7 @@
                 google.script.run
                     .withSuccessHandler(doLoginSuccess)
                     .withFailureHandler(function(err) {
+                        resetBtn();
                         showToast(err.message || 'Ralat log masuk!', 'error');
                     })
                     .verifyLogin(user, pass);
@@ -5136,7 +5676,7 @@
                             <label class="block text-xs font-bold text-gray-700 mb-1">Peranan</label>
                             <select name="role" class="w-full border rounded-xl p-3 text-sm bg-gray-50" required>
                                 <option value="ADMIN" ${u&&u.role==='ADMIN'?'selected':''}>Admin</option>
-                                <option value="GURU" ${u&&u.role==='GURU'?'selected':''}>Guru / Mentor (Kehadiran & Progres sahaja)</option>
+                                <option value="GURU" ${u&&u.role==='GURU'?'selected':''}>Mentor / AJK (Progres Mentee & Galeri)</option>
                                 <option value="SUPER_ADMIN" ${u&&u.role==='SUPER_ADMIN'?'selected':''}>Super Admin</option>
                             </select>
                         </div>
@@ -5215,6 +5755,7 @@
 
             // Kemaskini memori dahulu
             DB.settings = { ...DB.settings, ...data };
+            if (window.loadPrayerTimes) window.loadPrayerTimes(); // zon solat mungkin bertukar
 
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
@@ -5238,7 +5779,8 @@
                 subject: form.elements['subject'].value.trim(),
                 message: form.elements['message'].value.trim(),
                 date: new Date().toISOString().split('T')[0],
-                time: new Date().toLocaleTimeString('en-GB')
+                time: new Date().toLocaleTimeString('en-GB'),
+                updatedBy: actorName()
             };
             // Simpan ke memori + storan tempatan supaya admin boleh baca di halaman Maklum Balas
             if (!DB.feedback) DB.feedback = [];
@@ -5286,8 +5828,17 @@
             const form = e.target;
             const icRaw = form.elements['ic'] ? form.elements['ic'].value.trim() : '';
             const phone = form.elements['phone'].value.trim();
-            if (icRaw && !isValidIC(icRaw)) { showToast('No. Kad Pengenalan tidak sah. Format: YYMMDD-PB-XXXX.', 'error'); return; }
+            const imgData = document.getElementById('member-photo-data')?.value || '';
+            if (!icRaw || !isValidIC(icRaw)) { showToast('No. Kad Pengenalan wajib & mesti sah. Format: YYMMDD-PB-XXXX.', 'error'); return; }
             if (!isValidPhone(phone)) { showToast('No. Telefon tidak sah. Mesti bermula dengan 0 dan 9-12 digit.', 'error'); return; }
+            if (!imgData) { showToast('Gambar profil wajib dimuat naik. Sila pilih gambar wajah yang jelas.', 'error'); return; }
+            // Sekat permohonan berkembar: nama + IC + telefon sama 100% (dalam permohonan menunggu ATAU sudah jadi pelajar)
+            const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            const nameN = norm(form.elements['name'].value);
+            const dupPending = (DB.pendingMembers || []).some(p => norm(p.name) === nameN && String(p.ic) === icRaw && String(p.phone) === phone);
+            const dupStudent = (DB.students || []).some(s => norm(s.name) === nameN && String(s.ic || '') === icRaw && String(s.phone || '') === phone);
+            if (dupPending) { showToast('Permohonan dengan butiran yang sama telahpun dihantar dan sedang menunggu kelulusan admin.', 'error'); return; }
+            if (dupStudent) { showToast('Butiran ini telahpun berdaftar sebagai ahli/pelajar. Tiada permohonan baharu diperlukan.', 'error'); return; }
             const data = {
                 id: 'pm_' + Date.now(),
                 name: form.elements['name'].value.trim(),
@@ -5295,10 +5846,12 @@
                 phone: phone,
                 dept: form.elements['dept'].value,
                 semester: form.elements['semester'].value,
+                kelas: form.elements['kelas'] ? form.elements['kelas'].value : '',
                 level: form.elements['level'].value,
                 image: document.getElementById('member-photo-data')?.value || '',
                 date: new Date().toISOString().split('T')[0],
-                status: 'Menunggu'
+                status: 'Menunggu',
+                updatedBy: actorName()
             };
             if (!DB.pendingMembers) DB.pendingMembers = [];
             DB.pendingMembers.unshift(data);
@@ -5319,7 +5872,7 @@
             if (!pm) return;
             const newStudent = {
                 id: 's_' + Date.now(), name: pm.name, ic: pm.ic || '', phone: pm.phone, dept: pm.dept,
-                semester: pm.semester || 'Sem 1', level: pm.level || 'Al-Quran',
+                semester: pm.semester || 'Sem 1', kelas: pm.kelas || '', level: pm.level || 'Al-Quran',
                 year: state.filterYear, session: state.filterSession,
                 image: pm.image || 'https://placehold.co/300x300/059669/ffffff?text=' + encodeURIComponent(pm.name.slice(0, 2))
             };
@@ -5399,7 +5952,8 @@
                 method: form.elements['method'].value,
                 note: form.elements['note'] ? form.elements['note'].value.trim() : '',
                 year: state.filterYear,
-                session: state.filterSession
+                session: state.filterSession,
+                updatedBy: actorName()
             };
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
@@ -5426,7 +5980,8 @@
             const data = {
                 title: form.elements['title'].value.trim(),
                 content: form.elements['content'].value.trim(),
-                date: new Date().toISOString().split('T')[0]
+                date: new Date().toISOString().split('T')[0],
+                updatedBy: actorName()
             };
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
@@ -5622,6 +6177,15 @@
                             const color = isKnown ? 'green' : 'red';
                             new faceapi.draw.DrawBox(det.detection.box, { label: label, boxColor: color }).draw(canvas);
 
+                            // Wajah tidak dikenali → papar mesej gagal + butang Cuba Semula (maksimum sekali setiap 10 saat)
+                            if (!isKnown) {
+                                const now = Date.now();
+                                if (now - (window.__lastScanFail || 0) > 10000 && !document.getElementById('scan-result-overlay')) {
+                                    window.__lastScanFail = now;
+                                    window.showScanResult(false, 'Wajah tidak dikenali. Cuba hadap kamera dengan jelas.');
+                                }
+                            }
+
                             if (isKnown && !inFlight.has(best.label)) {
                                 inFlight.add(best.label);
                                 try {
@@ -5650,6 +6214,51 @@
             showToast('Imbasan dihentikan.', 'info');
         };
 
+        // Paparan besar keputusan imbasan — berjaya (5 saat, hijau) / gagal (merah + Cuba Semula) / sudah direkod (biru, 5 saat)
+        window.showScanResult = (ok, name, note) => {
+            document.getElementById('scan-result-overlay')?.remove();
+            const ov = document.createElement('div');
+            ov.id = 'scan-result-overlay';
+            ov.className = 'fixed inset-0 z-[120000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 fade-in';
+            if (ok === 'done') {
+                ov.innerHTML = `
+                    <div class="bg-white rounded-3xl shadow-2xl p-10 text-center max-w-sm w-full fade-in-up">
+                        <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl"><i class="fas fa-check-double"></i></div>
+                        <h2 class="text-2xl font-black text-blue-700 mb-1">SUDAH SELESAI</h2>
+                        <p class="text-lg font-bold text-gray-900">${name || ''}</p>
+                        <p class="text-sm text-gray-500 mt-1">Kehadiran anda telah direkodkan sebelum ini. Satu imbasan sahaja untuk setiap program.</p>
+                        <p class="text-[11px] text-gray-400 mt-4">Mesej ini akan tutup dalam 5 saat (klik untuk tutup segera)</p>
+                    </div>`;
+                ov.onclick = () => ov.remove();
+                const t = setTimeout(() => ov.remove(), 5000);
+                ov.addEventListener('click', () => clearTimeout(t));
+            } else if (ok) {
+                ov.innerHTML = `
+                    <div class="bg-white rounded-3xl shadow-2xl p-10 text-center max-w-sm w-full fade-in-up">
+                        <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl"><i class="fas fa-check"></i></div>
+                        <h2 class="text-2xl font-black text-green-700 mb-1">IMBASAN BERJAYA!</h2>
+                        <p class="text-lg font-bold text-gray-900">${name || ''}</p>
+                        <p class="text-sm text-gray-500 mt-1">Kehadiran telah direkodkan${note ? ' ' + note : ''} · ${new Date().toLocaleTimeString('en-GB')}</p>
+                        <p class="text-[11px] text-gray-400 mt-4">Mesej ini akan tutup dalam 5 saat (klik untuk tutup segera)</p>
+                    </div>`;
+                ov.onclick = () => ov.remove();
+                const t = setTimeout(() => ov.remove(), 5000);
+                ov.addEventListener('click', () => clearTimeout(t));
+            } else {
+                ov.innerHTML = `
+                    <div class="bg-white rounded-3xl shadow-2xl p-10 text-center max-w-sm w-full fade-in-up">
+                        <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl"><i class="fas fa-times"></i></div>
+                        <h2 class="text-2xl font-black text-red-700 mb-1">IMBASAN TIDAK BERJAYA</h2>
+                        <p class="text-sm text-gray-600">${name || 'Wajah tidak dikenali atau tidak jelas.'}</p>
+                        <p class="text-xs text-gray-400 mt-1">Pastikan wajah telah didaftarkan & pencahayaan baik.</p>
+                        <button id="scan-retry-btn" class="mt-6 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2"><i class="fas fa-redo"></i> Cuba Semula</button>
+                    </div>`;
+                ov.querySelector('#scan-retry-btn').onclick = () => { ov.remove(); };
+                ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+            }
+            document.body.appendChild(ov);
+        };
+
         window.markAttendance = (studentId) => {
             const programId = state.attendanceProgram;
             const program = window.resolveProgram(programId);
@@ -5669,7 +6278,11 @@
 
             // Simpan ke memori serta-merta
             const already = (DB.attendance || []).some(a => String(a.programId) === String(programId) && String(a.studentId) === String(studentId));
-            if (already) return Promise.resolve(false);
+            if (already) {
+                // Imbasan kali kedua untuk program sama — maklum sudah selesai (auto tutup 5 saat)
+                window.showScanResult('done', student.name);
+                return Promise.resolve(false);
+            }
 
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 return new Promise((resolve) => {
@@ -5679,8 +6292,10 @@
                                 DB.attendance.push({ id: result.id, ...formData, time: new Date().toLocaleTimeString('en-GB'), status: 'Hadir' });
                                 window.refreshScanAttendees();
                                 showToast(`${student.name} hadir!`, 'success');
+                                window.showScanResult(true, student.name);
                             } else if (result && result.error === 'duplicate') {
-                                // sudah hadir
+                                // sudah hadir di pelayan (imbasan kali kedua)
+                                window.showScanResult('done', student.name);
                             }
                             resolve(true);
                         })
@@ -5692,6 +6307,7 @@
                             DB.attendance.push({ id: 'att_' + Date.now(), ...formData, time: new Date().toLocaleTimeString('en-GB'), status: 'Hadir' });
                             window.refreshScanAttendees();
                             showToast(`${student.name} hadir! (offline — akan diselaraskan)`, 'info');
+                            window.showScanResult(true, student.name, '(offline)');
                             resolve(true);
                         })
                         .recordAttendance(formData);
@@ -5701,6 +6317,7 @@
                 DB.attendance.push({ id: 'att_' + Date.now(), ...formData, time: new Date().toLocaleTimeString('en-GB'), status: 'Hadir' });
                 window.refreshScanAttendees();
                 showToast(`${student.name} hadir!`, 'success');
+                window.showScanResult(true, student.name);
                 return Promise.resolve(true);
             }
         };
@@ -5759,12 +6376,12 @@
                     </div>
                     <div class="p-6">
                         <div class="flex flex-col items-center text-center mb-5">
-                            <img src="${s.image || 'https://placehold.co/200x200/064e3b/ffffff?text=' + encodeURIComponent((s.name || '?').slice(0, 2))}" alt="${s.name}" class="w-24 h-24 rounded-full object-cover border-4 border-primary-100 shadow-md mb-3" onerror="this.src='https://placehold.co/200x200/064e3b/ffffff?text=?'">
+                            <img src="${s.image || 'https://placehold.co/200x200/064e3b/ffffff?text=' + encodeURIComponent((s.name || '?').slice(0, 2))}" alt="${s.name}" onclick="window.viewImage('${(s.image || 'https://placehold.co/200x200/064e3b/ffffff?text=?').replace(/'/g, "\\'")}', '${s.name.replace(/'/g, "\\'")}')" title="Klik untuk skrin penuh" class="w-24 h-24 rounded-full object-cover border-4 border-primary-100 shadow-md mb-3 cursor-zoom-in hover:scale-105 transition" onerror="this.src='https://placehold.co/200x200/064e3b/ffffff?text=?'">
                             <p class="font-black text-gray-900 text-lg leading-tight">${s.name}</p>
                             <p class="text-xs font-bold text-primary-700 bg-primary-50 px-3 py-1 rounded-full mt-2">${s.dept} · ${jenisProgram}</p>
                         </div>
                         <div class="space-y-2.5 text-sm">
-                            <div class="flex justify-between border-b border-gray-100 pb-2"><span class="text-gray-500 font-semibold"><i class="fas fa-layer-group w-5 text-gray-400"></i>Jabatan</span><span class="font-bold text-gray-900">${s.dept}</span></div>
+                            <div class="flex justify-between border-b border-gray-100 pb-2"><span class="text-gray-500 font-semibold"><i class="fas fa-layer-group w-5 text-gray-400"></i>Jabatan</span><span class="font-bold text-gray-900">${window.studentCode(s)}</span></div>
                             <div class="flex justify-between border-b border-gray-100 pb-2"><span class="text-gray-500 font-semibold"><i class="fas fa-graduation-cap w-5 text-gray-400"></i>Semester</span><span class="font-bold text-gray-900">${s.semester} <span class="text-xs text-gray-400 font-semibold">/ ${maxSem} semester</span></span></div>
                             <div class="flex justify-between border-b border-gray-100 pb-2"><span class="text-gray-500 font-semibold"><i class="fas fa-book w-5 text-gray-400"></i>Tahap</span><span class="font-bold text-gray-900">${s.level || '-'}</span></div>
                             <div class="flex justify-between border-b border-gray-100 pb-2"><span class="text-gray-500 font-semibold"><i class="fas fa-phone w-5 text-gray-400"></i>Telefon</span><span class="font-bold text-gray-900">${s.phone || '-'}</span></div>
@@ -5881,6 +6498,100 @@
             router();
         };
 
+        // === LAPORAN INDIVIDU PELAJAR (kehadiran semua program & minggu PMI) ===
+        window.renderStudentReport = (studentId) => {
+            const body = document.getElementById('student-report-body');
+            if (!body) return;
+            state.attReportStudent = studentId || '';
+            if (!studentId) { body.innerHTML = ''; return; }
+            const s = (DB.students || []).find(x => String(x.id) === String(studentId));
+            if (!s) { body.innerHTML = ''; return; }
+
+            const year = state.filterYear, session = state.filterSession;
+            const todayIso = new Date().toLocaleDateString('en-CA');
+            const attendance = DB.attendance || [];
+            const excused = DB.excusedAbsences || [];
+
+            // Semua program sesi ini + semua minggu PMI yang telah berlalu
+            const events = [];
+            window.getPMIWeeks(year, session).filter(w => w.date <= todayIso).forEach(w => events.push({ id: w.id, title: 'PMI Minggu ' + w.week, date: w.date }));
+            (DB.programs || []).filter(p => String(p.year) === String(year) && p.session === session).forEach(p => events.push({ id: p.id, title: p.title, date: p.date }));
+            events.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+            const rows = events.map(ev => {
+                const hadir = attendance.some(a => String(a.programId) === String(ev.id) && String(a.studentId) === String(s.id));
+                const ber = excused.find(e => String(e.programId) === String(ev.id) && String(e.studentId) === String(s.id));
+                const status = hadir ? 'HADIR' : ber ? 'BERSEBAB' : 'TIDAK HADIR';
+                const cls = hadir ? 'bg-green-100 text-green-800 border-green-200' : ber ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-red-100 text-red-700 border-red-200';
+                const masa = hadir ? (attendance.find(a => String(a.programId) === String(ev.id) && String(a.studentId) === String(s.id)).time || '-') : ber ? ber.reason : '-';
+                return { ...ev, status, cls, masa, note: ber ? (ber.note || '') : '' };
+            });
+            const nHadir = rows.filter(r => r.status === 'HADIR').length;
+            const nBer = rows.filter(r => r.status === 'BERSEBAB').length;
+            const nTidak = rows.filter(r => r.status === 'TIDAK HADIR').length;
+            const pct = rows.length ? Math.round(nHadir / rows.length * 100) : 0;
+
+            body.innerHTML = `
+                <div id="printable-individual" class="mt-5">
+                    <div class="print-header" style="text-align:center; border-bottom:3px double #059669; padding-bottom:12px; margin-bottom:16px;">
+                        <h1 style="font-size:20px; font-weight:900; letter-spacing:1px;">${DB.settings.surauName.toUpperCase()}</h1>
+                        <p style="font-size:11px; color:#555;">${DB.settings.address} · ${DB.settings.phone}</p>
+                        <p style="font-size:13px; font-weight:bold; margin-top:6px;">LAPORAN KEHADIRAN INDIVIDU</p>
+                    </div>
+                    <div class="flex items-center gap-4 bg-gray-50 border rounded-2xl p-4 mb-4 flex-wrap">
+                        <img src="${s.image || 'https://placehold.co/96x96/064e3b/ffffff?text=' + encodeURIComponent((s.name || '?').slice(0, 2))}" class="w-16 h-16 rounded-full object-cover border-2 border-primary-200" onerror="this.src='https://placehold.co/96x96/064e3b/ffffff?text=?'">
+                        <div class="flex-grow min-w-0">
+                            <p class="font-black text-gray-900">${s.name}</p>
+                            <p class="text-xs text-gray-500 font-bold">${window.studentCode(s)} · ${s.level || ''} · ${session === 'jan-jun' ? 'Jan–Jun' : 'Julai–Dis'} ${year}</p>
+                        </div>
+                        <div class="text-center"><p class="text-2xl font-black ${pct >= 80 ? 'text-green-600' : pct >= 50 ? 'text-amber-600' : 'text-red-600'}">${pct}%</p><p class="text-[10px] font-bold text-gray-500 uppercase">Kehadiran</p></div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-center">
+                        <div class="bg-green-50 border border-green-200 rounded-xl p-3"><p class="text-xl font-black text-green-700">${nHadir}</p><p class="text-[10px] font-bold text-green-700 uppercase">Hadir</p></div>
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-3"><p class="text-xl font-black text-red-600">${nTidak}</p><p class="text-[10px] font-bold text-red-600 uppercase">Tidak Hadir</p></div>
+                        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><p class="text-xl font-black text-amber-600">${nBer}</p><p class="text-[10px] font-bold text-amber-600 uppercase">Bersebab</p></div>
+                        <div class="bg-gray-50 border rounded-xl p-3"><p class="text-xl font-black text-gray-700">${rows.length}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Jumlah Sesi</p></div>
+                    </div>
+                    <div class="overflow-x-auto border rounded-xl">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50"><tr><th class="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">Program / Sesi</th><th class="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">Tarikh</th><th class="px-4 py-2.5 text-center text-xs font-bold text-gray-500 uppercase">Status</th><th class="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">Masa / Sebab</th></tr></thead>
+                            <tbody class="divide-y divide-gray-100 bg-white">
+                                ${rows.map(r => `<tr><td class="px-4 py-2.5 font-semibold text-gray-900">${r.title}</td><td class="px-4 py-2.5 text-gray-600">${formatDate(r.date)}</td><td class="px-4 py-2.5 text-center"><span class="text-[10px] font-black px-2.5 py-1 rounded-full border ${r.cls}">${r.status}</span></td><td class="px-4 py-2.5 text-xs text-gray-500">${r.masa}${r.note ? ' · ' + r.note : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-400 italic">Tiada sesi direkodkan bagi tempoh ini.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-3">Dicetak pada ${formatDate(new Date().toISOString().split('T')[0])} oleh ${state.currentUser ? state.currentUser.name : ''}</p>
+
+                    ${(() => {
+                        // Rekod bacaan mentor-mentee individu ini
+                        const prog = (DB.studentProgress || [])
+                            .filter(p => String(p.mentee || '').toLowerCase() === String(s.name || '').toLowerCase())
+                            .sort((a, b) => String(b.lastUpdate || '').localeCompare(String(a.lastUpdate || '')));
+                        if (!prog.length) return '';
+                        return `
+                    <div class="mt-5">
+                        <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2"><i class="fas fa-book-reader mr-1 text-primary-600"></i>Rekod Bacaan (${prog.length})</p>
+                        <div class="overflow-x-auto border rounded-xl">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-primary-50/60"><tr><th class="px-4 py-2.5 text-left text-xs font-bold text-primary-800 uppercase">Tarikh</th><th class="px-4 py-2.5 text-left text-xs font-bold text-primary-800 uppercase">Tahap</th><th class="px-4 py-2.5 text-left text-xs font-bold text-primary-800 uppercase">Pencapaian</th><th class="px-4 py-2.5 text-left text-xs font-bold text-primary-800 uppercase">Mentor</th></tr></thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    ${prog.map(p => `<tr><td class="px-4 py-2.5 text-gray-600 whitespace-nowrap">${formatDate(p.lastUpdate)}</td><td class="px-4 py-2.5 font-bold text-gray-900">${p.level || '-'}</td><td class="px-4 py-2.5 font-black text-primary-800">${p.progress || '-'}</td><td class="px-4 py-2.5 text-gray-600">${p.mentor || '-'}</td></tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                    })()}
+                </div>`;
+        };
+
+        // Cetak laporan individu sahaja (elak bercampur dengan laporan program)
+        window.printStudentReport = () => {
+            const other = document.getElementById('printable-report');
+            if (other) other.id = 'printable-report-off';
+            window.print();
+            setTimeout(() => { const o = document.getElementById('printable-report-off'); if (o) o.id = 'printable-report'; }, 600);
+        };
+
         // === LAPORAN CARTA SETIAP PROGRAM (tab Laporan & Statistik) ===
         window.renderProgramReport = (pid) => {
             const body = document.getElementById('program-report-body');
@@ -5888,7 +6599,8 @@
             if (!pid) { body.innerHTML = '<p class="text-center text-gray-400 text-sm italic py-10">Pilih program di atas untuk melihat carta kehadiran.</p>'; return; }
 
             const year = state.filterYear, session = state.filterSession;
-            const sessionStudents = DB.students.filter(s => String(s.year) === String(year) && s.session === session);
+            // Laporan kehadiran untuk PELAJAR sahaja (staf dikecualikan) — samakan dengan laporan mingguan
+            const sessionStudents = window.getAudienceStudents(null, DB.students.filter(s => String(s.year) === String(year) && s.session === session));
             const attendance = DB.attendance || [];
             const excused = DB.excusedAbsences || [];
             const todayIso = new Date().toLocaleDateString('en-CA');
@@ -6425,11 +7137,11 @@
                     if (!isSuper) { html = closedPage('public', hash); guardBlocked = true; }
                 } else if (hash.startsWith('admin-') && state.currentUser) {
                     const roleUp = (state.currentUser.role || '').toUpperCase();
-                    // Guru/Mentor hanya boleh akses Kehadiran & Program (progres mentee)
-                    const GURU_ALLOWED = ['admin-attendance', 'admin-programs'];
+                    // Guru/Mentor hanya boleh akses halaman yang dibenarkan owner (Super Dashboard)
+                    const GURU_ALLOWED = window.getGuruAllowed();
                     if (roleUp === 'GURU' && !GURU_ALLOWED.includes(window.getAdminPageGroup(hash))) {
-                        showToast('Akaun Guru hanya boleh akses Kehadiran & Progres.', 'error');
-                        window.location.hash = 'admin-attendance';
+                        showToast('Akaun Guru tidak mempunyai akses ke halaman itu.', 'error');
+                        window.location.hash = GURU_ALLOWED[0] || 'home';
                         return;
                     }
                     const isSuper = roleUp === 'SUPER_ADMIN';
@@ -6455,6 +7167,7 @@
                         case 'donate': html = await Views.Donate(); break;
                         case 'login': html = await Views.Login(); break;
                         case 'admin-dashboard': html = await Views.AdminDashboard(); break;
+                        case 'admin-notifications': html = await Views.AdminNotifications(); break;
                         case 'admin-programs': html = await Views.AdminPrograms(); break;
                         case 'admin-classes': window.location.hash = 'admin-programs'; return; // digabungkan ke Program & Kelas
                         case 'admin-takwim': html = await Views.AdminTakwim(); break;
@@ -6503,7 +7216,7 @@
         // Apps Script tidak membenarkan fail berasingan manifest.json / sw.js.
         (function initPWA() {
             // Ikon SVG sebagai data URL (digunakan oleh manifest & butang install)
-            const ICON_SVG = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='#064e3b'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='serif' font-weight='bold'>D</text></svg>";
+            const ICON_SVG = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='#064e3b'/><text x='50' y='72' font-size='48' text-anchor='middle'>🕌</text></svg>";
             const iconUrl = 'data:image/svg+xml,' + encodeURIComponent(ICON_SVG);
 
             // 1. Suntik <link rel="manifest"> dengan Blob URL
