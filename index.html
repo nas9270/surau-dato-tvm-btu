@@ -644,6 +644,8 @@
             window.addEventListener('load', () => {
                 window.loadPrayerTimes();
                 setInterval(() => window.loadPrayerTimes(), 3600000);
+                // Hantar semula permohonan ahli yang tertangguh (jika ada)
+                setTimeout(() => { if (window.flushPendingQueue) window.flushPendingQueue(); }, 5000);
             });
         })();
 
@@ -2356,6 +2358,16 @@
                                     </label>
                                 </div>
                                 <input type="hidden" id="member-photo-data" value="">
+                                <div class="mt-2 bg-blue-50 border border-blue-200 rounded-xl p-3 text-[11px] text-blue-900 leading-relaxed">
+                                    <p class="font-bold mb-1"><i class="fas fa-id-card mr-1"></i>Format gambar diperlukan (seperti gambar passport):</p>
+                                    <ul class="list-disc list-inside space-y-0.5 text-blue-800">
+                                        <li><b>Setengah badan / muka sahaja</b> — wajah menghadap kamera dengan jelas</li>
+                                        <li>Latar belakang <b>cerah &amp; kemas</b> (dinding putih/plain digalakkan)</li>
+                                        <li>Cahaya cukup — <b>tidak gelap, tidak kabur, tidak terlalu jauh</b></li>
+                                        <li><b>Tanpa cermin mata hitam</b> atau topi yang menutup muka</li>
+                                        <li>Gambar ini digunakan untuk <b>imbasan kehadiran muka</b> — gambar yang jelas memastikan imbasan berjaya</li>
+                                    </ul>
+                                </div>
                             </div>
                             <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-xl shadow-md transition flex items-center justify-center gap-2"><i class="fas fa-user-check"></i> Hantar Permohonan</button>
                         </form>
@@ -3089,7 +3101,7 @@
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Profil Pelajar (Pilihan)</label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Pelajar <span class="font-normal text-gray-400">(Pilihan — format passport: muka jelas menghadap kamera, latar cerah; digunakan untuk imbasan kehadiran)</span></label>
                                 <input type="file" name="image" accept="image/*" class="w-full border rounded-xl p-2.5 text-sm bg-gray-50">
                             </div>
                             <div class="pt-3">
@@ -5801,6 +5813,24 @@
         const persistPending = () => { try { localStorage.setItem('surau_pending', JSON.stringify(DB.pendingMembers || [])); } catch (e) {} };
         const persistQuestions = () => { try { localStorage.setItem('surau_questions', JSON.stringify(DB.questions || [])); } catch (e) {} };
 
+        // Hantar semula permohonan yang tersimpan dalam gilir (jika pelayan sibuk sebelum ini)
+        window.flushPendingQueue = () => {
+            if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+            let q = [];
+            try { q = JSON.parse(localStorage.getItem('surau_pending_queue') || '[]'); } catch (e) {}
+            if (!q.length) return;
+            const baki = [];
+            q.forEach((data, i) => {
+                setTimeout(() => {
+                    google.script.run
+                        .withSuccessHandler(function() { showToast('Permohonan tertangguh (' + data.name + ') berjaya dihantar.', 'success'); })
+                        .withFailureHandler(function() { baki.push(data); try { localStorage.setItem('surau_pending_queue', JSON.stringify(baki)); } catch (e) {} })
+                        .submitPendingMember(data);
+                }, i * 2000); // jarakkan 2 saat setiap satu supaya tidak membanjiri pelayan
+            });
+            try { localStorage.setItem('surau_pending_queue', '[]'); } catch (e) {}
+        };
+
         // Gambar permohonan ahli: pratonton + mampat 300x300
         window.memberPhotoUpload = (input) => {
             const file = input.files && input.files[0];
@@ -5857,7 +5887,25 @@
             DB.pendingMembers.unshift(data);
             persistPending();
             if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run.withFailureHandler(function() {}).submitPendingMember(data);
+                // Jika pelayan sibuk (ramai mendaftar serentak), cuba semula automatik sehingga 3 kali
+                const cubaHantar = (percubaan) => {
+                    google.script.run
+                        .withFailureHandler(function(err) {
+                            if (percubaan < 3) {
+                                setTimeout(() => cubaHantar(percubaan + 1), 5000 * percubaan);
+                            } else {
+                                // Simpan dalam gilir tempatan supaya tidak hilang
+                                try {
+                                    const q = JSON.parse(localStorage.getItem('surau_pending_queue') || '[]');
+                                    q.push(data);
+                                    localStorage.setItem('surau_pending_queue', JSON.stringify(q));
+                                } catch (e) {}
+                                showToast('Pelayan sibuk. Permohonan anda disimpan — admin akan menyemaknya.', 'info');
+                            }
+                        })
+                        .submitPendingMember(data);
+                };
+                cubaHantar(1);
             }
             showToast('Permohonan diterima! Admin akan menyemak dan meluluskan.', 'success');
             form.reset();
@@ -6118,6 +6166,35 @@
             if (v) v.srcObject = null;
         };
 
+        // AUTO-PENDAFTARAN WAJAH: jana descriptor dari gambar pendaftaran pelajar
+        // (pelajar yang sudah muat naik gambar tidak perlu daftar wajah berasingan)
+        window.autoEnrollFromPhotos = async (onProgress) => {
+            const existing = new Set((DB.faceDescriptors || []).map(d => String(d.studentId)));
+            const targets = (DB.students || []).filter(s => s.image && !existing.has(String(s.id)));
+            if (!targets.length) return { done: 0, total: 0 };
+            let done = 0, failed = 0;
+            for (let i = 0; i < targets.length; i++) {
+                const s = targets[i];
+                if (onProgress) onProgress(i + 1, targets.length, s.name);
+                try {
+                    const img = await faceapi.fetchImage(s.image);
+                    const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+                        .withFaceLandmarks().withFaceDescriptor();
+                    if (det && det.descriptor) {
+                        const rec = { studentId: s.id, name: s.name, dept: s.dept, descriptor: JSON.stringify(Array.from(det.descriptor)) };
+                        const idx = DB.faceDescriptors.findIndex(d => String(d.studentId) === String(s.id));
+                        if (idx !== -1) DB.faceDescriptors[idx] = rec; else DB.faceDescriptors.push(rec);
+                        // Simpan ke Sheets (tanpa tunggu)
+                        if (typeof google !== 'undefined' && google.script && google.script.run) {
+                            try { google.script.run.saveFaceDescriptor(rec); } catch (e) {}
+                        }
+                        done++;
+                    } else { failed++; }
+                } catch (e) { failed++; console.warn('Auto-daftar wajah gagal:', s.name, e); }
+            }
+            return { done, total: targets.length, failed };
+        };
+
         window.startFaceScan = async () => {
             const programId = state.attendanceProgram;
             if (!programId) { showToast('Sila pilih program dahulu.', 'error'); return; }
@@ -6132,7 +6209,22 @@
             try {
                 await window.loadFaceModels();
                 buildFaceMatcher();
-                if (!faceMatcher) { showToast('Tiada wajah berdaftar. Sila daftar wajah pelajar dahulu.', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Mula Imbasan'; } return; }
+
+                // AUTO-PENDAFTARAN: jika ada pelajar bergambar tanpa data wajah, jana dari gambar pendaftaran
+                const existingSet = new Set((DB.faceDescriptors || []).map(d => String(d.studentId)));
+                const perluDaftar = (DB.students || []).filter(s => s.image && !existingSet.has(String(s.id))).length;
+                if (perluDaftar > 0) {
+                    if (statusEl) statusEl.textContent = 'Menjana data wajah dari gambar pendaftaran...';
+                    showToast(`Menjana data wajah ${perluDaftar} pelajar dari gambar pendaftaran (sekali sahaja)...`, 'info');
+                    const hasil = await window.autoEnrollFromPhotos((i, total, nama) => {
+                        if (statusEl) statusEl.textContent = `Menjana wajah ${i}/${total}: ${nama}`;
+                    });
+                    buildFaceMatcher();
+                    if (hasil.done > 0) showToast(`${hasil.done} wajah berjaya didaftar automatik dari gambar pendaftaran.`, 'success');
+                    if (hasil.failed > 0) showToast(`${hasil.failed} gambar tidak dapat dibaca wajahnya — pelajar berkenaan masih boleh daftar wajah manual.`, 'error');
+                }
+
+                if (!faceMatcher) { showToast('Tiada wajah berdaftar. Pastikan pelajar ada gambar pendaftaran, atau daftar wajah manual.', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Mula Imbasan'; } return; }
                 const video = await getCameraStream('scan-video');
                 // Tunggu sehingga metadata video tersedia (dengan timeout 10 saat)
                 if (video.readyState < 2) {
