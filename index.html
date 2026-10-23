@@ -5889,6 +5889,48 @@
             reader.readAsDataURL(file);
         };
 
+        // Anggaran pose kepala daripada landmarks 68-titik:
+        // yaw  = sisian hidung relatif kedua-dua mata (0 = hadap depan; ± = pusing kiri/kanan)
+        // pitch = kedudukan menegak hidung relatif mata & mulut (berubah bila dagu diangkat/ditunduk)
+        window.analisisPose = (det) => {
+            const lm = det.landmarks;
+            const cx = (a) => a.reduce((s, p) => s + p.x, 0) / a.length;
+            const cy = (a) => a.reduce((s, p) => s + p.y, 0) / a.length;
+            const le = lm.getLeftEye(), re = lm.getRightEye(), nose = lm.getNose(), mouth = lm.getMouth();
+            const noseTip = nose[3] || nose[nose.length - 1];
+            const leX = cx(le), reX = cx(re);
+            const eyeMidY = (cy(le) + cy(re)) / 2;
+            const w = (det.detection && det.detection.box && det.detection.box.width) || 1;
+            const yaw = ((noseTip.x - leX) - (reX - noseTip.x)) / w;
+            const pitch = (noseTip.y - eyeMidY) / Math.max(1, (cy(mouth) - eyeMidY));
+            return { yaw: Math.round(yaw * 1000) / 1000, pitch: Math.round(pitch * 1000) / 1000 };
+        };
+
+        // Semak samada frame SEKARANG sepadan dengan sudut yang DIMINTA.
+        // Pulang { ok, mesej } — mesej memberi panduan langsung kepada pelajar.
+        // arahPertama: tanda yaw sudut sisi pertama (untuk pastikan sudut kedua sisi BERLAWANAN)
+        window.semaPose = (poseIdx, det, baseline, arahPertama) => {
+            const { yaw, pitch } = window.analisisPose(det);
+            if (poseIdx === 0) {
+                // Hadap depan: yakni mengikut baseline diri sendiri
+                const ok = Math.abs(yaw - baseline.yaw) < 0.05 && Math.abs(pitch - baseline.pitch) < 0.07;
+                return { ok, yaw, pitch, mesej: ok ? '' : 'Hadap kamera terus (jangan pusing/angkat kepala)' };
+            }
+            if (poseIdx === 1 || poseIdx === 2) {
+                const d = yaw - baseline.yaw;
+                if (Math.abs(d) < 0.055) return { ok: false, yaw, pitch, mesej: 'Pusing kepala LEBIH banyak (≈20°) ke arah yang diminta' };
+                if (poseIdx === 1) return { ok: true, yaw, pitch, arah: d > 0 ? 1 : -1, mesej: '' };
+                // Sudut kedua: mesti sisi BERLAWANAN dengan sudut pertama
+                const arahSekarang = d > 0 ? 1 : -1;
+                if (arahPertama && arahSekarang === arahPertama) return { ok: false, yaw, pitch, mesej: 'Pusing ke sisi yang BERLAWANAN pula' };
+                return { ok: true, yaw, pitch, mesej: '' };
+            }
+            // poseIdx 3: dagu — perubahan pitch yang ketara (naik atau turun, mana-mana sudut tambah baik)
+            const dp = pitch - baseline.pitch;
+            if (Math.abs(dp) < 0.08) return { ok: false, yaw, pitch, mesej: 'Angkat dagu lebih tinggi (atau tunduk sedikit)' };
+            return { ok: true, yaw, pitch, mesej: '' };
+        };
+
         // IMBASAN WAJAH BORANG KEAHLIAN (HP pelajar): berpandu pelbagai sudut,
         // sampel disimpan dalam input tersembunyi 'member-face-data' (JSON),
         // dan 1 snapshot depan dijana automatik sebagai gambar profil.
@@ -5920,39 +5962,52 @@
                 await new Promise(r => setTimeout(r, 700));
                 const all = [];
                 let photoTaken = false;
+                let baseline = null;   // pose hadap-depan pelajar sendiri
+                let arahPertama = 0;   // arah yaw sudut sisi pertama
                 for (let p = 0; p < POSES.length; p++) {
                     const pose = POSES[p];
                     setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label}`);
                     showToast(pose.label, 'info');
                     let got = 0, attempts = 0;
-                    while (got < pose.frames && attempts < 30) {
+                    while (got < pose.frames && attempts < 40) {
                         attempts++;
                         const det = await detect(video);
-                        if (det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90) {
-                            all.push(Array.from(det.descriptor));
-                            got++;
-                            // Jana gambar profil dari frame pertama (hadap depan)
-                            if (!photoTaken) {
-                                try {
-                                    const c = document.createElement('canvas'); c.width = 300; c.height = 300;
-                                    const side = Math.min(video.videoWidth, video.videoHeight);
-                                    c.getContext('2d').drawImage(video, (video.videoWidth - side) / 2, (video.videoHeight - side) / 2, side, side, 0, 0, 300, 300);
-                                    const snap = c.toDataURL('image/jpeg', 0.85);
-                                    document.getElementById('member-photo-data').value = snap;
-                                    const pv = document.getElementById('member-photo-preview');
-                                    if (pv) { pv.src = snap; pv.classList.remove('hidden'); }
-                                    photoTaken = true;
-                                } catch (e) {}
-                            }
-                            setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames}`);
-                            await new Promise(r => setTimeout(r, 350));
-                        } else {
+                        if (!(det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90)) {
                             setStat(`Sudut ${p + 1}/${POSES.length}: tiada wajah jelas — sila ${pose.label.toLowerCase()}`);
                             await new Promise(r => setTimeout(r, 500));
+                            continue;
                         }
+                        // WAJIB: sahkan pose kepala sebenar sebelum terima sampel
+                        const { yaw, pitch } = window.analisisPose(det);
+                        if (p === 0 && baseline === null) baseline = { yaw, pitch };
+                        if (!baseline) { setStat('Pastikan wajah hadap kamera dahulu.'); await new Promise(r => setTimeout(r, 500)); continue; }
+                        const sema = window.semaPose(p, det, baseline, arahPertama);
+                        if (!sema.ok) {
+                            setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${sema.mesej}`);
+                            await new Promise(r => setTimeout(r, 500));
+                            continue;
+                        }
+                        if (p === 1 && !arahPertama) arahPertama = sema.arah || 0;
+                        all.push(Array.from(det.descriptor));
+                        got++;
+                        // Jana gambar profil dari frame pertama (hadap depan)
+                        if (!photoTaken) {
+                            try {
+                                const c = document.createElement('canvas'); c.width = 300; c.height = 300;
+                                const side = Math.min(video.videoWidth, video.videoHeight);
+                                c.getContext('2d').drawImage(video, (video.videoWidth - side) / 2, (video.videoHeight - side) / 2, side, side, 0, 0, 300, 300);
+                                const snap = c.toDataURL('image/jpeg', 0.85);
+                                document.getElementById('member-photo-data').value = snap;
+                                const pv = document.getElementById('member-photo-preview');
+                                if (pv) { pv.src = snap; pv.classList.remove('hidden'); }
+                                photoTaken = true;
+                            } catch (e) {}
+                        }
+                        setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames} ✓`);
+                        await new Promise(r => setTimeout(r, 350));
                     }
                     if (got === 0) {
-                        showToast(`Tiada wajah dikesan bagi sudut "${pose.label}". Cuba semula dengan pencahayaan baik.`, 'error');
+                        showToast(`Sudut "${pose.label}" tidak dapat disahkan. Pastikan anda benar-benar ${pose.label.toLowerCase()} dengan jelas, kemudian cuba semula.`, 'error');
                         setStat('Pendaftaran dibatalkan — tekan butang semula untuk cuba lagi.');
                         return;
                     }
@@ -7224,26 +7279,40 @@
                 }
                 await new Promise(r => setTimeout(r, 700)); // stabilkan kamera
                 const all = [];
+                let baseline = null;
+                let arahPertama = 0;
                 for (let p = 0; p < POSES.length; p++) {
                     const pose = POSES[p];
                     showToast(pose.label, 'info');
                     let got = 0, attempts = 0;
-                    while (got < pose.frames && attempts < 30) {
+                    while (got < pose.frames && attempts < 40) {
                         attempts++;
                         if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames}`;
                         const det = await detect(video);
-                        if (det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90) {
-                            all.push(Array.from(det.descriptor));
-                            got++;
-                            await new Promise(r => setTimeout(r, 350)); // jarak antara sampel
-                        } else {
+                        if (!(det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90)) {
                             if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: tiada wajah jelas — sila ${pose.label.toLowerCase()}`;
                             await new Promise(r => setTimeout(r, 500));
+                            continue;
                         }
+                        // WAJIB: sahkan pose kepala sebenar sebelum terima sampel
+                        const { yaw, pitch } = window.analisisPose(det);
+                        if (p === 0 && baseline === null) baseline = { yaw, pitch };
+                        if (!baseline) { if (statusEl) statusEl.textContent = 'Pastikan wajah hadap kamera dahulu.'; await new Promise(r => setTimeout(r, 500)); continue; }
+                        const sema = window.semaPose(p, det, baseline, arahPertama);
+                        if (!sema.ok) {
+                            if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${sema.mesej}`;
+                            await new Promise(r => setTimeout(r, 500));
+                            continue;
+                        }
+                        if (p === 1 && !arahPertama) arahPertama = sema.arah || 0;
+                        all.push(Array.from(det.descriptor));
+                        got++;
+                        if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames} ✓`;
+                        await new Promise(r => setTimeout(r, 350)); // jarak antara sampel
                     }
                     if (got === 0) {
-                        showToast(`Tiada wajah dikesan bagi sudut "${pose.label}". Cuba semula dengan pencahayaan baik.`, 'error');
-                        if (statusEl) statusEl.textContent = 'Pendaftaran dibatalkan — tekan butang untuk cuba semula.';
+                        showToast(`Sudut "${pose.label}" tidak dapat disahkan. Pastikan pelajar benar-benar ${pose.label.toLowerCase()} dengan jelas, kemudian cuba semula.`, 'error');
+                        if (statusEl) statusEl.textContent = 'Pendaftaran dibatalkan — tekan butang semula untuk cuba lagi.';
                         return;
                     }
                 }
