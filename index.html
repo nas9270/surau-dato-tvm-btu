@@ -6221,9 +6221,9 @@
                 } catch (e) { return null; }
             }).filter(Boolean);
             // threshold: nilai lebih kecil = lebih ketat (hanya padanan sangat rapat diterima).
-            // 0.45: dengan 230+ wajah berdaftar, 0.55 terlalu longgar dan menyebabkan SALAH KENAL
-            // (muka orang lain keluar nama orang lain). 0.45 jauh lebih ketat.
-            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.45) : null;
+            // 0.50: seimbang — 0.45 terlalu ketat di lapangan, 0.55 asal menyebabkan salah kenal
+            // (muka orang lain keluar nama orang lain) dengan 230+ wajah berdaftar.
+            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.50) : null;
             return faceMatcher;
         };
 
@@ -6387,13 +6387,15 @@
                 const nameMap = {};
                 (DB.students || []).forEach(s => { nameMap[String(s.id)] = s.name; });
 
-                // Padanan ketat: pulang 'unknown' kecuali (a) jarak ≤ 0.45, dan
-                // (b) padanan terbaik sekurang-kurangnya 0.05 lebih hampir daripada
+                // Padanan seimbang: pulang 'unknown' kecuali (a) jarak ≤ 0.50, dan
+                // (b) padanan terbaik sekurang-kurangnya 0.04 lebih hampir daripada
                 // pelajar LAIN terdekat (elak salah kenal antara wajah serupa),
-                // dan (c) wajah cukup besar/dekat di skrin (kotak ≥ 90px).
-                const MATCH_THRESHOLD = 0.45;
-                const MATCH_MARGIN = 0.05;
-                const MIN_BOX_PX = 90;
+                // dan (c) wajah cukup besar/dekat di skrin (kotak ≥ 80px).
+                // 0.50 = kompromi: 0.45 terlalu ketat di lapangan (pelajar lama
+                // berdescriptor 1-gambar lemah ditolak semua); 0.55 asal pula salah kenal.
+                const MATCH_THRESHOLD = 0.50;
+                const MATCH_MARGIN = 0.04;
+                const MIN_BOX_PX = 80;
                 const matchFace = (desc) => {
                     let best = null, bestOther = Infinity;
                     for (const ld of (faceMatcher.labeledDescriptors || [])) {
