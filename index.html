@@ -530,27 +530,92 @@
         };
 
         // Google Apps Script Integration - Muat data dari Sheets pada permulaan
+        // PENTING: data tempatan (backup localStorage) dipulihkan dahulu, kemudian data
+        // pelayan digabungkan ikut ID (union) — rekod yang ditambah pengguna TIDAK hilang
+        // walaupun tulisan ke pelayan gagal atau log masuk semula.
+        const DB_BACKUP_KEY = 'surau_db_v2';
+        const unionById = (local, server) => {
+            const map = new Map();
+            (local || []).forEach(r => { if (r && r.id !== undefined) map.set(String(r.id), r); });
+            (server || []).forEach(r => { if (r && r.id !== undefined) map.set(String(r.id), r); });
+            return Array.from(map.values());
+        };
+        window.restoreDBBackup = () => {
+            try {
+                const raw = localStorage.getItem(DB_BACKUP_KEY);
+                if (!raw) return false;
+                const b = JSON.parse(raw);
+                ['students','programs','classes','attendance','faceDescriptors','pendingMembers','announcements','donations','questions','certificates','galleries','excusedAbsences','studentProgress','feedback','departments'].forEach(k => {
+                    if (Array.isArray(b[k]) && b[k].length) window.DB[k] = unionById(window.DB[k], b[k]);
+                });
+                return true;
+            } catch (e) { console.warn('Backup DB rosak, diabaikan:', e); return false; }
+        };
+        // Simpan DB ke localStorage (kecuali rekod demo asal; gambar base64 diringankan
+        // supaya muat dalam had kuota ~5MB)
+        const DEMO_SEED_IDS = new Set(['s1','s2','s3','s4','s5']);
+        window.persistDB = () => {
+            try {
+                const ringan = (r) => {
+                    const c = { ...r };
+                    if (typeof c.image === 'string' && c.image.startsWith('data:')) c.image = '';
+                    if (typeof c.faceDescriptor === 'string' && c.faceDescriptor.length > 5000) c.faceDescriptor = '';
+                    return c;
+                };
+                const buat = (denganWajah) => {
+                    const o = {};
+                    ['students','programs','classes','attendance','faceDescriptors','pendingMembers','announcements','donations','questions','certificates','galleries','excusedAbsences','studentProgress','feedback','departments'].forEach(k => {
+                        let list = (window.DB[k] || []).filter(r => r && r.id !== undefined && !DEMO_SEED_IDS.has(String(r.id)));
+                        if (k === 'students' || k === 'pendingMembers') list = list.map(ringan);
+                        if (k === 'faceDescriptors' && !denganWajah) list = [];
+                        if (list.length) o[k] = list;
+                    });
+                    return JSON.stringify(o);
+                };
+                try {
+                    localStorage.setItem(DB_BACKUP_KEY, buat(true));
+                } catch (e) {
+                    // Kuota penuh → simpan tanpa data wajah (paling besar)
+                    localStorage.setItem(DB_BACKUP_KEY, buat(false));
+                }
+                return true;
+            } catch (e) { return false; }
+        };
+        // Auto-simpan: pantau perubahan saiz koleksi setiap 4 saat + semasa tutup halaman
+        (function autoPersist() {
+            let tanda = '';
+            const tandaSemasa = () => ['students','programs','classes','attendance','faceDescriptors','pendingMembers','announcements','donations','questions','certificates','galleries','excusedAbsences'].map(k => (window.DB[k]||[]).length).join(',');
+            setInterval(() => {
+                const t = tandaSemasa();
+                if (t !== tanda) { tanda = t; window.persistDB(); }
+            }, 4000);
+            window.addEventListener('beforeunload', window.persistDB);
+        })();
+
         window.initApp = function() {
+            // 1. Pulihkan data tempatan dahulu (perlindungan utama)
+            window.restoreDBBackup();
             if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(function(serverData) {
                         if (!serverData) return;
-                        if (serverData.students && serverData.students.length > 0) window.DB.students = serverData.students;
-                        if (serverData.programs && serverData.programs.length > 0) window.DB.programs = serverData.programs;
-                        if (serverData.classes && serverData.classes.length > 0) window.DB.classes = serverData.classes;
-                        if (serverData.studentProgress && serverData.studentProgress.length > 0) window.DB.studentProgress = serverData.studentProgress;
-                        if (serverData.galleries && serverData.galleries.length > 0) window.DB.galleries = serverData.galleries;
+                        // Gabung ikut ID — rekod pelayan menang konflik, rekod tempatan kekal
+                        if (serverData.students && serverData.students.length > 0) window.DB.students = unionById(window.DB.students, serverData.students);
+                        if (serverData.programs && serverData.programs.length > 0) window.DB.programs = unionById(window.DB.programs, serverData.programs);
+                        if (serverData.classes && serverData.classes.length > 0) window.DB.classes = unionById(window.DB.classes, serverData.classes);
+                        if (serverData.studentProgress && serverData.studentProgress.length > 0) window.DB.studentProgress = unionById(window.DB.studentProgress, serverData.studentProgress);
+                        if (serverData.galleries && serverData.galleries.length > 0) window.DB.galleries = unionById(window.DB.galleries, serverData.galleries);
                         if (serverData.users && serverData.users.length > 0) window.DB.users = serverData.users;
                         if (serverData.departments && serverData.departments.length > 0) window.DB.departments = serverData.departments;
-                        if (serverData.certificates && serverData.certificates.length > 0) window.DB.certificates = serverData.certificates;
-                        if (serverData.faceDescriptors && serverData.faceDescriptors.length > 0) window.DB.faceDescriptors = serverData.faceDescriptors;
-                        if (serverData.attendance && serverData.attendance.length > 0) window.DB.attendance = serverData.attendance;
-                        if (serverData.announcements && serverData.announcements.length > 0) window.DB.announcements = serverData.announcements;
-                        if (serverData.donations && serverData.donations.length > 0) window.DB.donations = serverData.donations;
+                        if (serverData.certificates && serverData.certificates.length > 0) window.DB.certificates = unionById(window.DB.certificates, serverData.certificates);
+                        if (serverData.faceDescriptors && serverData.faceDescriptors.length > 0) window.DB.faceDescriptors = unionById(window.DB.faceDescriptors, serverData.faceDescriptors);
+                        if (serverData.attendance && serverData.attendance.length > 0) window.DB.attendance = unionById(window.DB.attendance, serverData.attendance);
+                        if (serverData.announcements && serverData.announcements.length > 0) window.DB.announcements = unionById(window.DB.announcements, serverData.announcements);
+                        if (serverData.donations && serverData.donations.length > 0) window.DB.donations = unionById(window.DB.donations, serverData.donations);
                         if (serverData.feedback && serverData.feedback.length > 0) window.DB.feedback = serverData.feedback;
-                        if (serverData.excusedAbsences && serverData.excusedAbsences.length > 0) window.DB.excusedAbsences = serverData.excusedAbsences;
-                        if (serverData.pendingMembers && serverData.pendingMembers.length > 0) window.DB.pendingMembers = serverData.pendingMembers;
-                        if (serverData.questions && serverData.questions.length > 0) window.DB.questions = serverData.questions;
+                        if (serverData.excusedAbsences && serverData.excusedAbsences.length > 0) window.DB.excusedAbsences = unionById(window.DB.excusedAbsences, serverData.excusedAbsences);
+                        if (serverData.pendingMembers && serverData.pendingMembers.length > 0) window.DB.pendingMembers = unionById(window.DB.pendingMembers, serverData.pendingMembers);
+                        if (serverData.questions && serverData.questions.length > 0) window.DB.questions = unionById(window.DB.questions, serverData.questions);
                         // Kawalan paparan dari Sheets (jika disimpan sebagai JSON)
                         if (serverData.displayControl) {
                             try {
@@ -2382,8 +2447,15 @@
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Imbasan Wajah <span class="text-red-500">*</span> <span class="font-normal text-gray-400">(guna kamera depan HP anda)</span></label>
                                 <div class="relative bg-gray-900 rounded-2xl overflow-hidden border border-gray-200" style="aspect-ratio: 4/3;">
                                     <video id="member-face-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
+                                    <canvas id="member-face-guide" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
                                     <div id="member-face-status" class="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-sm">Kamera belum dimulakan</div>
                                     <div id="member-face-badge" class="absolute bottom-3 right-3 hidden bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-full"><i class="fas fa-check mr-1"></i> Wajah berjaya diimbas</div>
+                                </div>
+                                <div id="member-pose-chips" class="flex gap-2 mt-2">
+                                    <span id="member-pose-0" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-white/20 text-white/80 border border-white/30 transition">Depan</span>
+                                    <span id="member-pose-1" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-white/20 text-white/80 border border-white/30 transition">Kiri</span>
+                                    <span id="member-pose-2" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-white/20 text-white/80 border border-white/30 transition">Kanan</span>
+                                    <span id="member-pose-3" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-white/20 text-white/80 border border-white/30 transition">Dagu</span>
                                 </div>
                                 <button type="button" onclick="window.memberFaceScan()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera"></i> Mula Imbasan Wajah (Pelbagai Sudut)</button>
                                 <input type="hidden" id="member-photo-data" value="">
@@ -4513,7 +4585,14 @@
                             <div class="bg-gray-900 rounded-2xl overflow-hidden shadow-lg relative">
                                 <video id="enroll-video" autoplay playsinline muted class="w-full h-[420px] object-cover"></video>
                                 <canvas id="enroll-overlay" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                                <canvas id="enroll-face-guide" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
                                 <div id="enroll-status" class="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-sm">Menyediakan kamera...</div>
+                            </div>
+                            <div id="enroll-pose-chips" class="flex gap-2 mt-2">
+                                <span id="enroll-pose-0" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 transition">Depan</span>
+                                <span id="enroll-pose-1" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 transition">Kiri</span>
+                                <span id="enroll-pose-2" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 transition">Kanan</span>
+                                <span id="enroll-pose-3" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 transition">Dagu</span>
                             </div>
                         </div>
                         <div>
@@ -5889,6 +5968,51 @@
             reader.readAsDataURL(file);
         };
 
+        // === GARISSAN BENTUK MUKA (panduan oval) ===
+        // Amber = menunggu pose betul; HIJAU = sampel sudut sedang/selesai diambil.
+        // Cip 4 sudut (Depan/Kiri/Kanan/Dagu) bertukar hijau bila sudut lengkap.
+        window.__lukisOvalMuka = (canvasId, warna, teks) => {
+            const c = document.getElementById(canvasId);
+            if (!c) return;
+            const w = c.offsetWidth || 320, h = c.offsetHeight || 240;
+            if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, w, h);
+            ctx.save();
+            ctx.strokeStyle = warna;
+            ctx.lineWidth = 4;
+            ctx.setLineDash([14, 10]);
+            ctx.beginPath();
+            ctx.ellipse(w / 2, h * 0.42, w * 0.24, h * 0.33, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            if (teks) {
+                ctx.font = 'bold 15px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = warna;
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 4;
+                ctx.fillText(teks, w / 2, Math.min(h - 8, h * 0.42 + h * 0.33 + 24));
+            }
+            ctx.restore();
+        };
+        window.__setCipPose = (prefix, idx, keadaan) => {
+            const el = document.getElementById(prefix + '-pose-' + idx);
+            if (!el) return;
+            const nama = ['Depan', 'Kiri', 'Kanan', 'Dagu'][idx] || '';
+            if (keadaan === 'siap') {
+                el.className = 'flex-1 text-center text-[11px] font-black px-2 py-1.5 rounded-lg bg-green-600 text-white border border-green-700 transition';
+                el.innerHTML = '<i class="fas fa-check mr-0.5"></i>' + nama;
+            } else if (keadaan === 'aktif') {
+                el.className = 'flex-1 text-center text-[11px] font-black px-2 py-1.5 rounded-lg bg-amber-500 text-white border border-amber-600 animate-pulse transition';
+                el.innerHTML = '<i class="fas fa-camera mr-0.5"></i>' + nama;
+            } else {
+                el.className = 'flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 transition';
+                el.textContent = nama;
+            }
+        };
+        window.__resetCipPose = (prefix) => { for (let i = 0; i < 4; i++) window.__setCipPose(prefix, i, 'kosong'); };
+
         // Anggaran pose kepala daripada landmarks 68-titik:
         // yaw  = sisian hidung relatif kedua-dua mata (0 = hadap depan; ± = pusing kiri/kanan)
         // pitch = kedudukan menegak hidung relatif mata & mulut (berubah bila dagu diangkat/ditunduk)
@@ -5948,8 +6072,10 @@
                 { label: 'Pusing kepala sedikit ke KANAN', frames: 3 },
                 { label: 'Angkat dagu sedikit ke atas', frames: 2 }
             ];
-            const detect = (v) => faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions())
+            const detect = (v) => faceapi.detectSingleFace(v, window.__opsiPengesanDaftar())
                 .withFaceLandmarks().withFaceDescriptor();
+            const OV = '#22c55e', AM = '#f59e0b'; // hijau = diterima, amber = menunggu
+            window.__resetCipPose('member');
             try {
                 await window.loadFaceModels();
                 const video = await getCameraStream('member-face-video');
@@ -5960,6 +6086,7 @@
                     });
                 }
                 await new Promise(r => setTimeout(r, 700));
+                window.__lukisOvalMuka('member-face-guide', AM, 'Letak wajah anda dalam garisan');
                 const all = [];
                 let photoTaken = false;
                 let baseline = null;   // pose hadap-depan pelajar sendiri
@@ -5968,12 +6095,14 @@
                     const pose = POSES[p];
                     setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label}`);
                     showToast(pose.label, 'info');
+                    window.__setCipPose('member', p, 'aktif');
                     let got = 0, attempts = 0;
                     while (got < pose.frames && attempts < 40) {
                         attempts++;
                         const det = await detect(video);
                         if (!(det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90)) {
                             setStat(`Sudut ${p + 1}/${POSES.length}: tiada wajah jelas — sila ${pose.label.toLowerCase()}`);
+                            window.__lukisOvalMuka('member-face-guide', AM, 'Muka tidak jelas — hampiri kamera');
                             await new Promise(r => setTimeout(r, 500));
                             continue;
                         }
@@ -5984,12 +6113,15 @@
                         const sema = window.semaPose(p, det, baseline, arahPertama);
                         if (!sema.ok) {
                             setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${sema.mesej}`);
+                            window.__lukisOvalMuka('member-face-guide', AM, sema.mesej);
                             await new Promise(r => setTimeout(r, 500));
                             continue;
                         }
                         if (p === 1 && !arahPertama) arahPertama = sema.arah || 0;
                         all.push(Array.from(det.descriptor));
                         got++;
+                        // GARISSAN HIJAU — sampel sudut ini diterima
+                        window.__lukisOvalMuka('member-face-guide', OV, `✓ ${got}/${pose.frames}`);
                         // Jana gambar profil dari frame pertama (hadap depan)
                         if (!photoTaken) {
                             try {
@@ -6009,11 +6141,15 @@
                     if (got === 0) {
                         showToast(`Sudut "${pose.label}" tidak dapat disahkan. Pastikan anda benar-benar ${pose.label.toLowerCase()} dengan jelas, kemudian cuba semula.`, 'error');
                         setStat('Pendaftaran dibatalkan — tekan butang semula untuk cuba lagi.');
+                        window.__setCipPose('member', p, 'kosong');
+                        window.__lukisOvalMuka('member-face-guide', '#ef4444', 'Dibatalkan — cuba semula');
                         return;
                     }
+                    window.__setCipPose('member', p, 'siap');
                 }
                 document.getElementById('member-face-data').value = JSON.stringify(all);
                 setStat(`Selesai! ${all.length} sampel wajah (${POSES.length} sudut) berjaya diimbas.`);
+                window.__lukisOvalMuka('member-face-guide', OV, '✓ SEMUA SUDUT SELESAI');
                 if (badge) badge.classList.remove('hidden');
                 showToast('Wajah anda berjaya diimbas. Seterusnya, hantar permohonan di bawah.', 'success');
                 stopCamera();
@@ -6247,6 +6383,7 @@
         const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model';
 
         let faceModelsLoaded = false;
+        let ssdModelSedia = false; // pengesan lebih tepat untuk PENDAFTARAN wajah
         let faceStream = null;
         let scanActive = false;
         let scanInterval = null;
@@ -6260,7 +6397,21 @@
                 faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
                 faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL)
             ]);
+            // MODEL LEBIH TEPAT (SsdMobilenetv1) untuk pendaftaran wajah —
+            // jika gagal dimuat (rangkaian), sistem masih berfungsi dengan TinyFaceDetector.
+            try {
+                await faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL);
+                ssdModelSedia = !!faceapi.nets.ssdMobilenetv1.isLoaded;
+            } catch (e) { ssdModelSedia = false; }
             faceModelsLoaded = true;
+        };
+
+        // Pilihan pengesan untuk PENDAFTARAN: guna SsdMobilenet (lebih tepat) bila ada,
+        // jatuh balik ke TinyFaceDetector bila tiada. Imbasan kehadiran tetap guna
+        // TinyFaceDetector kerana lebih pantas untuk kitaran 1.5 saat.
+        window.__opsiPengesanDaftar = () => {
+            if (ssdModelSedia) return new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+            return new faceapi.TinyFaceDetectorOptions();
         };
 
         // Bina FaceMatcher dari descriptor yang tersimpan
@@ -7266,8 +7417,10 @@
                 { label: 'Pusing kepala sedikit ke KANAN', frames: 3 },
                 { label: 'Angkat dagu sedikit ke atas', frames: 2 }
             ];
-            const detect = (v) => faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions())
+            const detect = (v) => faceapi.detectSingleFace(v, window.__opsiPengesanDaftar())
                 .withFaceLandmarks().withFaceDescriptor();
+            const OV = '#22c55e', AM = '#f59e0b';
+            window.__resetCipPose('enroll');
             try {
                 await window.loadFaceModels();
                 const video = await getCameraStream('enroll-video');
@@ -7278,12 +7431,14 @@
                     });
                 }
                 await new Promise(r => setTimeout(r, 700)); // stabilkan kamera
+                window.__lukisOvalMuka('enroll-face-guide', AM, 'Letak wajah dalam garisan');
                 const all = [];
                 let baseline = null;
                 let arahPertama = 0;
                 for (let p = 0; p < POSES.length; p++) {
                     const pose = POSES[p];
                     showToast(pose.label, 'info');
+                    window.__setCipPose('enroll', p, 'aktif');
                     let got = 0, attempts = 0;
                     while (got < pose.frames && attempts < 40) {
                         attempts++;
@@ -7291,6 +7446,7 @@
                         const det = await detect(video);
                         if (!(det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90)) {
                             if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: tiada wajah jelas — sila ${pose.label.toLowerCase()}`;
+                            window.__lukisOvalMuka('enroll-face-guide', AM, 'Muka tidak jelas — hampiri kamera');
                             await new Promise(r => setTimeout(r, 500));
                             continue;
                         }
@@ -7301,22 +7457,28 @@
                         const sema = window.semaPose(p, det, baseline, arahPertama);
                         if (!sema.ok) {
                             if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${sema.mesej}`;
+                            window.__lukisOvalMuka('enroll-face-guide', AM, sema.mesej);
                             await new Promise(r => setTimeout(r, 500));
                             continue;
                         }
                         if (p === 1 && !arahPertama) arahPertama = sema.arah || 0;
                         all.push(Array.from(det.descriptor));
                         got++;
+                        window.__lukisOvalMuka('enroll-face-guide', OV, `✓ ${got}/${pose.frames}`);
                         if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames} ✓`;
                         await new Promise(r => setTimeout(r, 350)); // jarak antara sampel
                     }
                     if (got === 0) {
                         showToast(`Sudut "${pose.label}" tidak dapat disahkan. Pastikan pelajar benar-benar ${pose.label.toLowerCase()} dengan jelas, kemudian cuba semula.`, 'error');
                         if (statusEl) statusEl.textContent = 'Pendaftaran dibatalkan — tekan butang semula untuk cuba lagi.';
+                        window.__setCipPose('enroll', p, 'kosong');
+                        window.__lukisOvalMuka('enroll-face-guide', '#ef4444', 'Dibatalkan — cuba semula');
                         return;
                     }
+                    window.__setCipPose('enroll', p, 'siap');
                 }
                 if (statusEl) statusEl.textContent = `Menyimpan ${all.length} sampel wajah (${POSES.length} sudut)...`;
+                window.__lukisOvalMuka('enroll-face-guide', OV, '✓ SEMUA SUDUT SELESAI');
                 window.__persistFaceDescriptor(student, all);
             } catch (e) {
                 if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
