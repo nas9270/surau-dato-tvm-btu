@@ -2345,10 +2345,9 @@
                     <!-- Daftar Ahli / Jemaah — medan 100% sama seperti borang Tambah Pelajar (admin); SEMUA wajib -->
                     <div class="bg-white rounded-2xl border p-8 shadow-sm mt-8">
                         <h2 class="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2"><i class="fas fa-user-plus text-primary-600"></i> Daftar Ahli / Jemaah Surau</h2>
-                        <p class="text-xs text-gray-500 mb-5">Semua ruangan <strong>wajib</strong> diisi termasuk gambar. Permohonan akan disemak dan diluluskan oleh admin.</p>
+                        <p class="text-xs text-gray-500 mb-5">Semua ruangan wajib diisi termasuk imbasan wajah (guna kamera HP anda). Permohonan akan disemak dan diluluskan oleh admin.</p>
                         <form onsubmit="window.submitMemberForm(event)" class="space-y-4">
                             <div><label class="block text-xs font-bold text-gray-700 mb-1">Nama Penuh <span class="text-red-500">*</span></label><input type="text" name="name" class="w-full border rounded-xl p-3 text-sm" placeholder="Nama penuh seperti IC" required></div>
-                            <div><label class="block text-xs font-bold text-gray-700 mb-1">No. Kad Pengenalan <span class="text-red-500">*</span></label><input type="text" name="ic" class="w-full border rounded-xl p-3 text-sm" placeholder="040506-13-1234" required></div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div><label class="block text-xs font-bold text-gray-700 mb-1">No. Telefon <span class="text-red-500">*</span></label><input type="text" name="phone" class="w-full border rounded-xl p-3 text-sm" placeholder="012-3456789" required></div>
                                 <div><label class="block text-xs font-bold text-gray-700 mb-1">Jabatan <span class="text-red-500">*</span></label>
@@ -2380,23 +2379,23 @@
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Profil <span class="text-red-500">*</span> <span class="font-normal text-gray-400">(wajah jelas menghadap kamera)</span></label>
-                                <div class="flex items-center gap-3">
-                                    <img id="member-photo-preview" class="w-16 h-16 rounded-full object-cover border-2 border-primary-100 hidden">
-                                    <label class="cursor-pointer flex-1 text-center text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border-2 border-dashed border-primary-200 px-4 py-3 rounded-xl transition">
-                                        <i class="fas fa-camera mr-1"></i> Pilih Gambar (wajib)
-                                        <input type="file" name="image" accept="image/*" class="hidden" onchange="window.memberPhotoUpload(this)">
-                                    </label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Imbasan Wajah <span class="text-red-500">*</span> <span class="font-normal text-gray-400">(guna kamera depan HP anda)</span></label>
+                                <div class="relative bg-gray-900 rounded-2xl overflow-hidden border border-gray-200" style="aspect-ratio: 4/3;">
+                                    <video id="member-face-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
+                                    <div id="member-face-status" class="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-sm">Kamera belum dimulakan</div>
+                                    <div id="member-face-badge" class="absolute bottom-3 right-3 hidden bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-full"><i class="fas fa-check mr-1"></i> Wajah berjaya diimbas</div>
                                 </div>
+                                <button type="button" onclick="window.memberFaceScan()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera"></i> Mula Imbasan Wajah (Pelbagai Sudut)</button>
                                 <input type="hidden" id="member-photo-data" value="">
+                                <input type="hidden" id="member-face-data" value="">
+                                <img id="member-photo-preview" class="w-16 h-16 rounded-full object-cover border-2 border-primary-100 mt-3 hidden">
                                 <div class="mt-2 bg-blue-50 border border-blue-200 rounded-xl p-3 text-[11px] text-blue-900 leading-relaxed">
-                                    <p class="font-bold mb-1"><i class="fas fa-id-card mr-1"></i>Format gambar diperlukan (seperti gambar passport):</p>
+                                    <p class="font-bold mb-1"><i class="fas fa-id-card mr-1"></i>Tiada muat naik gambar diperlukan — imbas wajah anda terus dari HP:</p>
                                     <ul class="list-disc list-inside space-y-0.5 text-blue-800">
-                                        <li><b>Setengah badan / muka sahaja</b> — wajah menghadap kamera dengan jelas</li>
-                                        <li>Latar belakang <b>cerah &amp; kemas</b> (dinding putih/plain digalakkan)</li>
-                                        <li>Cahaya cukup — <b>tidak gelap, tidak kabur, tidak terlalu jauh</b></li>
+                                        <li>Tekan butang di atas dan ikut arahan di skrin: <b>hadap depan, pusing sedikit ke kiri, ke kanan, angkat dagu</b></li>
+                                        <li>Cahaya cukup — <b>tidak gelap, tidak kabur</b>, muka memenuhi sebahagian besar skrin</li>
                                         <li><b>Tanpa cermin mata hitam</b> atau topi yang menutup muka</li>
-                                        <li>Gambar ini digunakan untuk <b>imbasan kehadiran muka</b> — gambar yang jelas memastikan imbasan berjaya</li>
+                                        <li>Wajah ini digunakan untuk <b>imbasan kehadiran</b> di surau — pastikan semua sudut diimbas</li>
                                     </ul>
                                 </div>
                             </div>
@@ -4242,16 +4241,17 @@
                                 }).join('');
                                 return `
                                 <div class="border-b last:border-0">
-                                    <div class="px-4 py-2.5 bg-gray-50 flex items-center gap-2">
-                                        <span class="bg-gray-900 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-wider">${g.dept}</span>
-                                        <span class="text-xs font-bold text-green-700">${g.list.length} hadir</span>
+                                    <div class="px-4 py-2.5 bg-gray-50 flex items-center gap-3 sticky top-0 bg-gray-50/95 backdrop-blur z-10">
+                                        <span class="bg-gray-900 text-white text-base font-black px-3.5 py-1 rounded-xl tracking-widest shadow-sm">${g.dept}</span>
+                                        <span class="text-sm font-black text-green-700">${g.list.length} hadir</span>
+                                        <button onclick="window.__attHiddenDeptsHadir = window.__attHiddenDeptsHadir || {}; window.__attHiddenDeptsHadir['${g.dept}'] = !window.__attHiddenDeptsHadir['${g.dept}']; router();" class="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition whitespace-nowrap flex-shrink-0 ${((window.__attHiddenDeptsHadir || {})[g.dept]) ? 'text-gray-500 bg-white border-gray-200 hover:bg-gray-100' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'}"><i class="fas ${((window.__attHiddenDeptsHadir || {})[g.dept]) ? 'fa-chevron-down' : 'fa-chevron-up'} mr-1"></i>${((window.__attHiddenDeptsHadir || {})[g.dept]) ? 'Tunjuk' : 'Sorok'}</button>
                                     </div>
-                                    <div class="divide-y divide-gray-100">${items}</div>
+                                    <div class="divide-y divide-gray-100 ${((window.__attHiddenDeptsHadir || {})[g.dept]) ? 'hidden' : ''}">${items}</div>
                                 </div>`;
                             }).join('');
                             const remaining = att.length - LIMIT;
                             return `
-                        <div class="bg-white rounded-2xl border shadow-sm overflow-hidden mb-6">
+                        <div class="bg-white rounded-2xl border shadow-sm mb-6">
                             <div class="p-4 bg-green-50 border-b font-bold text-green-800 flex items-center justify-between flex-wrap gap-2">
                                 <span><i class="fas fa-user-check mr-2"></i>Senarai Hadir (${att.length})</span>
                                 <span class="text-[10px] font-semibold text-green-600 uppercase tracking-wider">Susunan: Jabatan · Semester (Sem 1 dahulu)</span>
@@ -4278,7 +4278,7 @@
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                        <div class="bg-white rounded-2xl border shadow-sm">
                             <div class="p-4 bg-red-50 border-b font-bold text-red-700"><i class="fas fa-user-times mr-2"></i>Senarai Tidak Hadir (${absent.length})</div>
                             <div class="p-4 space-y-5">
                                 ${(() => {
@@ -4292,14 +4292,20 @@
                                     // Jabatan luar senarai (jika ada) diletakkan di hujung
                                     const others = sorted.filter(s => !DEPARTMENTS_LIST.includes(String(s.dept).toUpperCase()));
                                     if (others.length) groups.push({ dept: 'LAIN', list: others });
-                                    return groups.map(g => `
+                                    return groups.map(g => {
+                                        // Status sorok per jabatan (kekal semasa router render semula)
+                                        if (!window.__attHiddenDepts) window.__attHiddenDepts = {};
+                                        const hidden = !!window.__attHiddenDepts[g.dept];
+                                        const gid = 'att-absent-' + g.dept;
+                                        return `
                                         <div>
-                                            <div class="flex items-center gap-2 mb-3">
-                                                <span class="bg-gray-900 text-white text-[11px] font-black px-3 py-1 rounded-lg tracking-wider">${g.dept}</span>
-                                                <span class="text-xs font-bold text-red-600">${g.list.length} tidak hadir</span>
-                                                <div class="flex-grow border-t border-dashed border-gray-200"></div>
+                                            <div class="flex items-center gap-3 mb-3 sticky top-0 bg-white/95 backdrop-blur z-10 py-2">
+                                                <span class="bg-gray-900 text-white text-xl font-black px-4 py-1.5 rounded-xl tracking-widest shadow-sm">${g.dept}</span>
+                                                <span class="text-lg font-black text-red-600 whitespace-nowrap">${g.list.length} tidak hadir</span>
+                                                <div class="flex-grow border-t-2 border-dashed border-gray-300"></div>
+                                                <button onclick="window.__attHiddenDepts['${g.dept}'] = !window.__attHiddenDepts['${g.dept}']; router();" class="text-xs font-bold px-3 py-2 rounded-xl border transition whitespace-nowrap flex-shrink-0 ${hidden ? 'text-gray-500 bg-gray-50 border-gray-200 hover:bg-gray-100' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'}"><i class="fas ${hidden ? 'fa-chevron-down' : 'fa-chevron-up'} mr-1"></i>${hidden ? 'Tunjuk' : 'Sorok'}</button>
                                             </div>
-                                            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                            <div id="${gid}" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 ${hidden ? 'hidden' : ''}">
                                                 ${g.list.map(s => {
                                                     const kod = window.studentCode(s);
                                                     return `
@@ -4313,7 +4319,7 @@
                                                     </div>`;
                                                 }).join('')}
                                             </div>
-                                        </div>`).join('') || '<p class="py-8 text-center text-gray-500">Semua pelajar hadir. Alhamdulillah!</p>';
+                                        </div>`;}).join('') || '<p class="py-8 text-center text-gray-500">Semua pelajar hadir. Alhamdulillah!</p>';
                                 })()}
                             </div>
                         </div>
@@ -4395,27 +4401,12 @@
                     <h1 class="text-2xl font-black text-gray-900 mb-2">Laporan Kehadiran</h1>
                     <p class="text-sm text-gray-500 mb-6">Pilih program untuk melihat ringkasan kehadiran mengikut jabatan.</p>
 
+                    <!-- Laporan Individu Pelajar (di atas sekali — akses pantas) -->
                     <div class="bg-white rounded-2xl border shadow-sm p-6 mb-6">
-                        <label class="block text-xs font-bold text-gray-700 mb-2">Pilih Program</label>
-                        <select onchange="window.selectAttendanceProgram(this.value)" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
-                            <option value="">-- Pilih Program / Sesi PMI --</option>
-                            <optgroup label="PMI — Setiap Jumaat">
-                                ${pmiWeeks.map(w => `<option value="${w.id}" ${String(state.attendanceProgram)===String(w.id)?'selected':''}>PMI Minggu ${w.week} (${formatDate(w.date)})</option>`).join('')}
-                            </optgroup>
-                            <optgroup label="Program Lain">
-                                ${programs.map(p => `<option value="${p.id}" ${String(state.attendanceProgram)===String(p.id)?'selected':''}>${p.title} (${formatDate(p.date)})</option>`).join('')}
-                            </optgroup>
-                        </select>
-                    </div>
-
-                    ${reportHtml || '<div class="bg-white rounded-2xl border p-16 text-center text-gray-500"><i class="fas fa-file-alt text-4xl text-gray-300 mb-3"></i><p>Sila pilih program di atas untuk menjana laporan.</p></div>'}
-
-                    <!-- Laporan Individu Pelajar -->
-                    <div class="bg-white rounded-2xl border shadow-sm p-6 mt-8">
                         <div class="flex items-center justify-between flex-wrap gap-3 mb-4 border-b pb-4">
                             <div>
                                 <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2"><i class="fas fa-id-card text-primary-600"></i> Laporan Individu Pelajar</h2>
-                                <p class="text-xs text-gray-500 mt-0.5">Pilih pelajar untuk melihat rekod kehadiran individu bagi semua program & minggu PMI.</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Pilih jabatan dan semester untuk tapis senarai, kemudian pilih pelajar — tiada perlu taip nama.</p>
                             </div>
                         </div>
                         <div class="flex flex-col sm:flex-row gap-3">
@@ -4436,6 +4427,21 @@
                         </div>
                         <div id="student-report-body"></div>
                     </div>
+
+                    <div class="bg-white rounded-2xl border shadow-sm p-6 mb-6">
+                        <label class="block text-xs font-bold text-gray-700 mb-2">Pilih Program</label>
+                        <select onchange="window.selectAttendanceProgram(this.value)" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                            <option value="">-- Pilih Program / Sesi PMI --</option>
+                            <optgroup label="PMI — Setiap Jumaat">
+                                ${pmiWeeks.map(w => `<option value="${w.id}" ${String(state.attendanceProgram)===String(w.id)?'selected':''}>PMI Minggu ${w.week} (${formatDate(w.date)})</option>`).join('')}
+                            </optgroup>
+                            <optgroup label="Program Lain">
+                                ${programs.map(p => `<option value="${p.id}" ${String(state.attendanceProgram)===String(p.id)?'selected':''}>${p.title} (${formatDate(p.date)})</option>`).join('')}
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    ${reportHtml || '<div class="bg-white rounded-2xl border p-16 text-center text-gray-500"><i class="fas fa-file-alt text-4xl text-gray-300 mb-3"></i><p>Sila pilih program di atas untuk menjana laporan.</p></div>'}
                 `, 'admin-attendance-report');
             },
 
@@ -4517,9 +4523,8 @@
                                     <option value="">-- Pilih Pelajar --</option>
                                     ${students.map(s => `<option value="${s.id}">${s.name} (${s.dept}) ${enrolledIds.has(String(s.id)) ? '✓' : ''}</option>`).join('')}
                                 </select>
-                                <button onclick="window.captureFace()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera"></i> Tangkap Wajah</button>
-                                <button onclick="window.enrollFromPhoto()" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-image"></i> Daftar Wajah Dari Gambar Profil</button>
-                                <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Pastikan muka menghadap kamera dengan pencahayaan baik. Alternatif: gunakan gambar profil yang jelas (wajah menghadap) tanpa kamera.</p>
+                                <button onclick="window.captureFace()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera"></i> Daftar Wajah (Imbas Pelbagai Sudut)</button>
+                                <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Pelajar tidak perlu muat naik gambar. Pilih nama pelajar, tekan butang, dan ikut arahan di skrin: hadap depan, pusing sedikit ke kiri, ke kanan, dan angkat dagu — sistem menangkap wajah dari setiap sudut secara automatik. Pastikan pencahayaan baik dan wajah cukup dekat dengan kamera.</p>
                             </div>
                         </div>
                     </div>
@@ -5884,32 +5889,113 @@
             reader.readAsDataURL(file);
         };
 
+        // IMBASAN WAJAH BORANG KEAHLIAN (HP pelajar): berpandu pelbagai sudut,
+        // sampel disimpan dalam input tersembunyi 'member-face-data' (JSON),
+        // dan 1 snapshot depan dijana automatik sebagai gambar profil.
+        window.__memberScanBusy = false;
+        window.memberFaceScan = async () => {
+            if (window.__memberScanBusy) return;
+            const statusEl = document.getElementById('member-face-status');
+            const badge = document.getElementById('member-face-badge');
+            const setStat = (t) => { if (statusEl) statusEl.textContent = t; };
+            if (badge) badge.classList.add('hidden');
+            window.__memberScanBusy = true;
+            const POSES = [
+                { label: 'Hadap kamera terus (depan)', frames: 4 },
+                { label: 'Pusing kepala sedikit ke KIRI', frames: 3 },
+                { label: 'Pusing kepala sedikit ke KANAN', frames: 3 },
+                { label: 'Angkat dagu sedikit ke atas', frames: 2 }
+            ];
+            const detect = (v) => faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks().withFaceDescriptor();
+            try {
+                await window.loadFaceModels();
+                const video = await getCameraStream('member-face-video');
+                if (video.readyState < 2) {
+                    await new Promise((res, rej) => {
+                        const t = setTimeout(() => { video.onloadeddata = null; rej(new Error('Kamera terlalu lama untuk dimulakan.')); }, 10000);
+                        video.onloadeddata = () => { clearTimeout(t); res(); };
+                    });
+                }
+                await new Promise(r => setTimeout(r, 700));
+                const all = [];
+                let photoTaken = false;
+                for (let p = 0; p < POSES.length; p++) {
+                    const pose = POSES[p];
+                    setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label}`);
+                    showToast(pose.label, 'info');
+                    let got = 0, attempts = 0;
+                    while (got < pose.frames && attempts < 30) {
+                        attempts++;
+                        const det = await detect(video);
+                        if (det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90) {
+                            all.push(Array.from(det.descriptor));
+                            got++;
+                            // Jana gambar profil dari frame pertama (hadap depan)
+                            if (!photoTaken) {
+                                try {
+                                    const c = document.createElement('canvas'); c.width = 300; c.height = 300;
+                                    const side = Math.min(video.videoWidth, video.videoHeight);
+                                    c.getContext('2d').drawImage(video, (video.videoWidth - side) / 2, (video.videoHeight - side) / 2, side, side, 0, 0, 300, 300);
+                                    const snap = c.toDataURL('image/jpeg', 0.85);
+                                    document.getElementById('member-photo-data').value = snap;
+                                    const pv = document.getElementById('member-photo-preview');
+                                    if (pv) { pv.src = snap; pv.classList.remove('hidden'); }
+                                    photoTaken = true;
+                                } catch (e) {}
+                            }
+                            setStat(`Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames}`);
+                            await new Promise(r => setTimeout(r, 350));
+                        } else {
+                            setStat(`Sudut ${p + 1}/${POSES.length}: tiada wajah jelas — sila ${pose.label.toLowerCase()}`);
+                            await new Promise(r => setTimeout(r, 500));
+                        }
+                    }
+                    if (got === 0) {
+                        showToast(`Tiada wajah dikesan bagi sudut "${pose.label}". Cuba semula dengan pencahayaan baik.`, 'error');
+                        setStat('Pendaftaran dibatalkan — tekan butang semula untuk cuba lagi.');
+                        return;
+                    }
+                }
+                document.getElementById('member-face-data').value = JSON.stringify(all);
+                setStat(`Selesai! ${all.length} sampel wajah (${POSES.length} sudut) berjaya diimbas.`);
+                if (badge) badge.classList.remove('hidden');
+                showToast('Wajah anda berjaya diimbas. Seterusnya, hantar permohonan di bawah.', 'success');
+                stopCamera();
+            } catch (e) {
+                setStat('Ralat: ' + (e.message || e));
+                showToast('Ralat kamera: ' + (e.message || e), 'error');
+            } finally {
+                window.__memberScanBusy = false;
+            }
+        };
+
         window.submitMemberForm = (e) => {
             e.preventDefault();
             const form = e.target;
-            const icRaw = form.elements['ic'] ? form.elements['ic'].value.trim() : '';
             const phone = form.elements['phone'].value.trim();
             const imgData = document.getElementById('member-photo-data')?.value || '';
-            if (!icRaw || !isValidIC(icRaw)) { showToast('No. Kad Pengenalan wajib & mesti sah. Format: YYMMDD-PB-XXXX.', 'error'); return; }
+            const faceData = document.getElementById('member-face-data')?.value || '';
             if (!isValidPhone(phone)) { showToast('No. Telefon tidak sah. Mesti bermula dengan 0 dan 9-12 digit.', 'error'); return; }
-            if (!imgData) { showToast('Gambar profil wajib dimuat naik. Sila pilih gambar wajah yang jelas.', 'error'); return; }
-            // Sekat permohonan berkembar: nama + IC + telefon sama 100% (dalam permohonan menunggu ATAU sudah jadi pelajar)
+            if (!faceData) { showToast('Wajah belum diimbas. Tekan butang "Mula Imbasan Wajah" dan ikut arahan di skrin.', 'error'); return; }
+            // Sekat permohonan berkembar: nama + telefon sama 100% (dalam permohonan menunggu ATAU sudah jadi pelajar)
             const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
             const nameN = norm(form.elements['name'].value);
-            const dupPending = (DB.pendingMembers || []).some(p => norm(p.name) === nameN && String(p.ic) === icRaw && String(p.phone) === phone);
-            const dupStudent = (DB.students || []).some(s => norm(s.name) === nameN && String(s.ic || '') === icRaw && String(s.phone || '') === phone);
+            const dupPending = (DB.pendingMembers || []).some(p => norm(p.name) === nameN && String(p.phone) === phone);
+            const dupStudent = (DB.students || []).some(s => norm(s.name) === nameN && String(s.phone || '') === phone);
             if (dupPending) { showToast('Permohonan dengan butiran yang sama telahpun dihantar dan sedang menunggu kelulusan admin.', 'error'); return; }
             if (dupStudent) { showToast('Butiran ini telahpun berdaftar sebagai ahli/pelajar. Tiada permohonan baharu diperlukan.', 'error'); return; }
             const data = {
                 id: 'pm_' + Date.now(),
                 name: form.elements['name'].value.trim(),
-                ic: icRaw,
+                ic: '',
                 phone: phone,
                 dept: form.elements['dept'].value,
                 semester: form.elements['semester'].value,
                 kelas: form.elements['kelas'] ? form.elements['kelas'].value : '',
                 level: form.elements['level'].value,
                 image: document.getElementById('member-photo-data')?.value || '',
+                faceDescriptor: document.getElementById('member-face-data')?.value || '',
                 date: new Date().toISOString().split('T')[0],
                 status: 'Menunggu',
                 updatedBy: actorName()
@@ -5942,6 +6028,10 @@
             form.reset();
             const pv = document.getElementById('member-photo-preview');
             if (pv) { pv.src = ''; pv.classList.add('hidden'); }
+            const fb = document.getElementById('member-face-badge');
+            if (fb) fb.classList.add('hidden');
+            const fs = document.getElementById('member-face-status');
+            if (fs) fs.textContent = 'Kamera belum dimulakan';
         };
 
         // Admin: luluskan permohonan ahli → masuk senarai pelajar/ahli (biodata penuh)
@@ -5956,6 +6046,22 @@
                 image: pm.image || 'https://placehold.co/300x300/059669/ffffff?text=' + encodeURIComponent(pm.name.slice(0, 2))
             };
             DB.students.push(newStudent);
+            // Daftar wajah terus dari sampel yang diimbas semasa permohonan (tiada imbasan semula)
+            if (pm.faceDescriptor) {
+                try {
+                    const arr = typeof pm.faceDescriptor === 'string' ? JSON.parse(pm.faceDescriptor) : pm.faceDescriptor;
+                    const norm = Array.isArray(arr) && Array.isArray(arr[0]) ? arr : [arr];
+                    if (norm.length && norm[0] && norm[0].length === 128) {
+                        const rec = { studentId: newStudent.id, name: pm.name, dept: pm.dept, descriptor: JSON.stringify(norm) };
+                        const idx = DB.faceDescriptors.findIndex(d => String(d.studentId) === String(newStudent.id));
+                        if (idx !== -1) DB.faceDescriptors[idx] = rec; else DB.faceDescriptors.push(rec);
+                        buildFaceMatcher();
+                        if (typeof google !== 'undefined' && google.script && google.script.run) {
+                            google.script.run.withFailureHandler(function() {}).saveFaceDescriptor(rec);
+                        }
+                    }
+                } catch (e) { console.warn('Daftar wajah permohonan gagal:', e); }
+            }
             DB.pendingMembers = DB.pendingMembers.filter(x => x.id !== id);
             persistPending();
             if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -6108,12 +6214,16 @@
             const labeled = descriptors.map(d => {
                 try {
                     const arr = typeof d.descriptor === 'string' ? JSON.parse(d.descriptor) : d.descriptor;
-                    return new faceapi.LabeledFaceDescriptors(String(d.studentId), [new Float32Array(arr)]);
+                    // Sokong pelbagai sampel: descriptor boleh jadi senarai 128 nombor (lama)
+                    // atau senarai berisi beberapa sampel (pendaftaran pelbagai sudut).
+                    const list = Array.isArray(arr) && Array.isArray(arr[0]) ? arr : [arr];
+                    return new faceapi.LabeledFaceDescriptors(String(d.studentId), list.map(a => new Float32Array(a)));
                 } catch (e) { return null; }
             }).filter(Boolean);
             // threshold: nilai lebih kecil = lebih ketat (hanya padanan sangat rapat diterima).
-            // 0.55 adalah kompromi baik untuk elak salah kenal & elak terlalu banyak 'unknown'.
-            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.55) : null;
+            // 0.45: dengan 230+ wajah berdaftar, 0.55 terlalu longgar dan menyebabkan SALAH KENAL
+            // (muka orang lain keluar nama orang lain). 0.45 jauh lebih ketat.
+            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.45) : null;
             return faceMatcher;
         };
 
@@ -6277,6 +6387,32 @@
                 const nameMap = {};
                 (DB.students || []).forEach(s => { nameMap[String(s.id)] = s.name; });
 
+                // Padanan ketat: pulang 'unknown' kecuali (a) jarak ≤ 0.45, dan
+                // (b) padanan terbaik sekurang-kurangnya 0.05 lebih hampir daripada
+                // pelajar LAIN terdekat (elak salah kenal antara wajah serupa),
+                // dan (c) wajah cukup besar/dekat di skrin (kotak ≥ 90px).
+                const MATCH_THRESHOLD = 0.45;
+                const MATCH_MARGIN = 0.05;
+                const MIN_BOX_PX = 90;
+                const matchFace = (desc) => {
+                    let best = null, bestOther = Infinity;
+                    for (const ld of (faceMatcher.labeledDescriptors || [])) {
+                        for (const d of ld.descriptors) {
+                            const dist = faceapi.euclideanDistance(desc, d);
+                            if (!best || dist < best.distance) {
+                                if (best && best.label !== ld.label && best.distance < bestOther) bestOther = best.distance;
+                                best = { label: ld.label, distance: dist };
+                            } else if (ld.label !== best.label && dist < bestOther) {
+                                bestOther = dist;
+                            }
+                        }
+                    }
+                    if (!best) return { label: 'unknown' };
+                    if (best.distance > MATCH_THRESHOLD) return { label: 'unknown' };
+                    if (bestOther - best.distance < MATCH_MARGIN) return { label: 'unknown' };
+                    return best;
+                };
+
                 // Guard in-flight: elak hantar rekod sama berkali-kali dalam frame berturut-turut
                 const inFlight = new Set();
 
@@ -6293,7 +6429,9 @@
                         faceapi.draw.drawDetections(canvas, resizedDetections);
 
                         for (const det of resizedDetections) {
-                            const best = faceMatcher.findBestMatch(det.descriptor);
+                            // Abaikan wajah terlalu kecil/jauh — descriptor tidak boleh dipercayai
+                            if (!det.detection || !det.detection.box || det.detection.box.width < MIN_BOX_PX) continue;
+                            const best = matchFace(det.descriptor);
                             const isKnown = best.label !== 'unknown';
                             // Papar nama pelajar (bukan ID mentah) pada kotak
                             const label = isKnown ? (nameMap[best.label] || best.label) : 'Tidak dikenali';
@@ -7057,12 +7195,22 @@
             container.innerHTML = list.map(a => `<div class="flex items-center gap-3 bg-green-50 rounded-xl p-2.5 border border-green-100"><i class="fas fa-check-circle text-green-600"></i><div class="min-w-0"><p class="font-bold text-gray-900 text-sm truncate">${a.name}</p><p class="text-xs text-gray-500">${a.dept} · ${a.time || ''}</p></div></div>`).join('') || '<p class="text-xs text-gray-400 italic">Belum ada rekod kehadiran.</p>';
         };
 
+        // PENDAFTARAN WAJAH PELBAGAI SUDUT: pelajar imbas wajah sendiri melalui kamera
+        // dari beberapa sudut (depan, kiri, kanan, dagu terangkat) — tiada muat naik gambar.
         window.captureFace = async () => {
             const studentId = document.getElementById('enroll-student')?.value;
             if (!studentId) { showToast('Sila pilih pelajar dahulu.', 'error'); return; }
             const student = DB.students.find(s => String(s.id) === String(studentId));
             if (!student) { showToast('Rekod pelajar tidak ditemui. Mungkin telah dipadam.', 'error'); return; }
             const statusEl = document.getElementById('enroll-status');
+            const POSES = [
+                { label: 'Hadap kamera terus (depan)', frames: 4 },
+                { label: 'Pusing kepala sedikit ke KIRI', frames: 3 },
+                { label: 'Pusing kepala sedikit ke KANAN', frames: 3 },
+                { label: 'Angkat dagu sedikit ke atas', frames: 2 }
+            ];
+            const detect = (v) => faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks().withFaceDescriptor();
             try {
                 await window.loadFaceModels();
                 const video = await getCameraStream('enroll-video');
@@ -7072,53 +7220,33 @@
                         video.onloadeddata = () => { clearTimeout(timeout); res(); };
                     });
                 }
-                if (statusEl) statusEl.textContent = 'Mengesan wajah...';
-
-                // Tunggu sedikit untuk kamera stabil
-                await new Promise(r => setTimeout(r, 500));
-                const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
-
-                if (!detection) {
-                    if (statusEl) statusEl.textContent = 'Tiada wajah dikesan. Sila hadap kamera.';
-                    showToast('Tiada wajah dikesan. Sila hadap kamera dengan pencahayaan baik.', 'error');
-                    return;
+                await new Promise(r => setTimeout(r, 700)); // stabilkan kamera
+                const all = [];
+                for (let p = 0; p < POSES.length; p++) {
+                    const pose = POSES[p];
+                    showToast(pose.label, 'info');
+                    let got = 0, attempts = 0;
+                    while (got < pose.frames && attempts < 30) {
+                        attempts++;
+                        if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames}`;
+                        const det = await detect(video);
+                        if (det && det.descriptor && det.detection && det.detection.box && det.detection.box.width >= 90) {
+                            all.push(Array.from(det.descriptor));
+                            got++;
+                            await new Promise(r => setTimeout(r, 350)); // jarak antara sampel
+                        } else {
+                            if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: tiada wajah jelas — sila ${pose.label.toLowerCase()}`;
+                            await new Promise(r => setTimeout(r, 500));
+                        }
+                    }
+                    if (got === 0) {
+                        showToast(`Tiada wajah dikesan bagi sudut "${pose.label}". Cuba semula dengan pencahayaan baik.`, 'error');
+                        if (statusEl) statusEl.textContent = 'Pendaftaran dibatalkan — tekan butang untuk cuba semula.';
+                        return;
+                    }
                 }
-
-                const descriptor = Array.from(detection.descriptor);
-                const formData = { studentId: student.id, name: student.name, dept: student.dept, descriptor: descriptor };
-
-                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run
-                        .withSuccessHandler(function(result) {
-                            if (result && result.success) {
-                                // Kemaskini memori
-                                const idx = DB.faceDescriptors.findIndex(d => String(d.studentId) === String(studentId));
-                                if (idx !== -1) DB.faceDescriptors[idx] = { studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(descriptor) };
-                                else DB.faceDescriptors.push({ studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(descriptor) });
-                                buildFaceMatcher();
-                                showToast('Wajah ' + student.name + ' berjaya didaftarkan!', 'success');
-                                stopCamera();
-                                router();
-                            } else {
-                                showToast('Gagal menyimpan wajah.', 'error');
-                            }
-                        })
-                        .withFailureHandler(function(err) {
-                            showToast('Ralat: ' + (err.message || err), 'error');
-                        })
-                        .saveFaceDescriptor(formData);
-                } else {
-                    // Fallback tempatan
-                    const idx = DB.faceDescriptors.findIndex(d => String(d.studentId) === String(studentId));
-                    const item = { studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(descriptor) };
-                    if (idx !== -1) DB.faceDescriptors[idx] = item; else DB.faceDescriptors.push(item);
-                    buildFaceMatcher();
-                    showToast('Wajah ' + student.name + ' berjaya didaftarkan (tempatan)!', 'success');
-                    stopCamera();
-                    router();
-                }
+                if (statusEl) statusEl.textContent = `Menyimpan ${all.length} sampel wajah (${POSES.length} sudut)...`;
+                window.__persistFaceDescriptor(student, all);
             } catch (e) {
                 if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
                 showToast('Ralat kamera: ' + (e.message || e), 'error');
