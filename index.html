@@ -5281,7 +5281,10 @@
                             state.filterYear = String(year);
                             state.filterSession = session;
                             showToast('Pelajar berjaya disimpan!', 'success');
-                            const mod = form.closest('.fixed'); 
+                            // Jana data wajah serta-merta di latar belakang (supaya imbasan pantas kelak)
+                            const baru = DB.students[DB.students.length - 1];
+                            if (baru && baru.image && !String(baru.image).includes('placehold.co')) window.autoEnrollOne(baru);
+                            const mod = form.closest('.fixed');
                             if(mod) { mod.remove(); } else { form.reset(); window.location.hash = 'admin-students'; }
                             router();
                         })
@@ -6254,6 +6257,9 @@
                         }
                     }
                 } catch (e) { console.warn('Daftar wajah permohonan gagal:', e); }
+            } else if (pm.image && !String(pm.image).includes('placehold.co')) {
+                // Tiada sampel wajah — jana dari gambar pendaftaran di latar belakang
+                window.autoEnrollOne(newStudent);
             }
             DB.pendingMembers = DB.pendingMembers.filter(x => x.id !== id);
             persistPending();
@@ -6519,6 +6525,26 @@
             if (v) v.srcObject = null;
         };
 
+        // Jana data wajah untuk SEORANG pelajar baharu (latar belakang, tanpa ganggu aliran)
+        window.autoEnrollOne = async (student) => {
+            try {
+                if (!student || !student.image) return;
+                if ((DB.faceDescriptors || []).some(d => String(d.studentId) === String(student.id))) return;
+                await window.loadFaceModels();
+                const img = await faceapi.fetchImage(student.image);
+                const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks().withFaceDescriptor();
+                if (det && det.descriptor) {
+                    const rec = { studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(Array.from(det.descriptor)) };
+                    DB.faceDescriptors.push(rec);
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        try { google.script.run.saveFaceDescriptor(rec); } catch (e) {}
+                    }
+                    showToast('Data wajah ' + student.name + ' sedia untuk imbasan.', 'success');
+                }
+            } catch (e) { console.warn('autoEnrollOne gagal:', e); }
+        };
+
         // AUTO-PENDAFTARAN WAJAH: jana descriptor dari gambar pendaftaran pelajar
         // (pelajar yang sudah muat naik gambar tidak perlu daftar wajah berasingan)
         // PENTING: hanya pelajar sesi & tahun semasa — pelajar sesi lepas tidak diproses
@@ -6567,24 +6593,26 @@
                 await window.loadFaceModels();
                 buildFaceMatcher();
 
-                // AUTO-PENDAFTARAN: jika ada pelajar SESI SEMASA bergambar tanpa data wajah, jana dari gambar pendaftaran
+                // AUTO-PENDAFTARAN LATAR BELAKANG: jangan sekat kamera — jana data wajah
+                // sambil imbasan berjalan; matcher dibina semula setiap kali wajah baharu siap
                 const existingSet = new Set((DB.faceDescriptors || []).map(d => String(d.studentId)));
                 const perluDaftar = (DB.students || []).filter(s =>
                     s.image && !existingSet.has(String(s.id)) &&
                     String(s.year) === String(state.filterYear) && s.session === state.filterSession
                 ).length;
                 if (perluDaftar > 0) {
-                    if (statusEl) statusEl.textContent = 'Menjana data wajah dari gambar pendaftaran...';
-                    showToast(`Menjana data wajah ${perluDaftar} pelajar dari gambar pendaftaran (sekali sahaja)...`, 'info');
-                    const hasil = await window.autoEnrollFromPhotos((i, total, nama) => {
-                        if (statusEl) statusEl.textContent = `Menjana wajah ${i}/${total}: ${nama}`;
+                    showToast(`Menjana data wajah ${perluDaftar} pelajar di latar belakang — imbasan boleh bermula serta-merta.`, 'info');
+                    window.autoEnrollFromPhotos((i, total, nama) => {
+                        if (statusEl) statusEl.textContent = `Imbasan aktif · menyediakan wajah ${i}/${total}`;
+                        buildFaceMatcher(); // matcher dikemas kini secara beransur
+                    }).then(hasil => {
+                        buildFaceMatcher();
+                        if (hasil.done > 0) showToast(`${hasil.done} wajah sedia untuk imbasan.`, 'success');
+                        if (hasil.failed > 0) showToast(`${hasil.failed} gambar tidak dapat dibaca wajahnya — pelajar itu perlu daftar wajah manual.`, 'error');
                     });
-                    buildFaceMatcher();
-                    if (hasil.done > 0) showToast(`${hasil.done} wajah berjaya didaftar automatik dari gambar pendaftaran.`, 'success');
-                    if (hasil.failed > 0) showToast(`${hasil.failed} gambar tidak dapat dibaca wajahnya — pelajar berkenaan masih boleh daftar wajah manual.`, 'error');
                 }
 
-                if (!faceMatcher) { showToast('Tiada wajah berdaftar. Pastikan pelajar ada gambar pendaftaran, atau daftar wajah manual.', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Mula Imbasan'; } return; }
+                if (!faceMatcher && perluDaftar === 0) { showToast('Tiada wajah berdaftar. Pastikan pelajar ada gambar pendaftaran, atau daftar wajah manual.', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Mula Imbasan'; } return; }
                 const video = await getCameraStream('scan-video');
                 // Tunggu sehingga metadata video tersedia (dengan timeout 10 saat)
                 if (video.readyState < 2) {
@@ -6652,6 +6680,11 @@
                         for (const det of resizedDetections) {
                             // Abaikan wajah terlalu kecil/jauh — descriptor tidak boleh dipercayai
                             if (!det.detection || !det.detection.box || det.detection.box.width < MIN_BOX_PX) continue;
+                            // Jika matcher belum sedia (data wajah sedang dijana di latar), lukis kotak sahaja
+                            if (!faceMatcher) {
+                                new faceapi.draw.DrawBox(det.detection.box, { label: 'Menyediakan data wajah...', boxColor: 'orange' }).draw(canvas);
+                                continue;
+                            }
                             const best = matchFace(det.descriptor);
                             const isKnown = best.label !== 'unknown';
                             // Papar nama pelajar (bukan ID mentah) pada kotak
