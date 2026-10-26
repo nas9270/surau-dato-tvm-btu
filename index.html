@@ -599,23 +599,25 @@
                 google.script.run
                     .withSuccessHandler(function(serverData) {
                         if (!serverData) return;
-                        // Gabung ikut ID — rekod pelayan menang konflik, rekod tempatan kekal
-                        if (serverData.students && serverData.students.length > 0) window.DB.students = unionById(window.DB.students, serverData.students);
-                        if (serverData.programs && serverData.programs.length > 0) window.DB.programs = unionById(window.DB.programs, serverData.programs);
-                        if (serverData.classes && serverData.classes.length > 0) window.DB.classes = unionById(window.DB.classes, serverData.classes);
-                        if (serverData.studentProgress && serverData.studentProgress.length > 0) window.DB.studentProgress = unionById(window.DB.studentProgress, serverData.studentProgress);
-                        if (serverData.galleries && serverData.galleries.length > 0) window.DB.galleries = unionById(window.DB.galleries, serverData.galleries);
-                        if (serverData.users && serverData.users.length > 0) window.DB.users = serverData.users;
-                        if (serverData.departments && serverData.departments.length > 0) window.DB.departments = serverData.departments;
-                        if (serverData.certificates && serverData.certificates.length > 0) window.DB.certificates = unionById(window.DB.certificates, serverData.certificates);
-                        if (serverData.faceDescriptors && serverData.faceDescriptors.length > 0) window.DB.faceDescriptors = unionById(window.DB.faceDescriptors, serverData.faceDescriptors);
-                        if (serverData.attendance && serverData.attendance.length > 0) window.DB.attendance = unionById(window.DB.attendance, serverData.attendance);
-                        if (serverData.announcements && serverData.announcements.length > 0) window.DB.announcements = unionById(window.DB.announcements, serverData.announcements);
-                        if (serverData.donations && serverData.donations.length > 0) window.DB.donations = unionById(window.DB.donations, serverData.donations);
-                        if (serverData.feedback && serverData.feedback.length > 0) window.DB.feedback = serverData.feedback;
-                        if (serverData.excusedAbsences && serverData.excusedAbsences.length > 0) window.DB.excusedAbsences = unionById(window.DB.excusedAbsences, serverData.excusedAbsences);
-                        if (serverData.pendingMembers && serverData.pendingMembers.length > 0) window.DB.pendingMembers = unionById(window.DB.pendingMembers, serverData.pendingMembers);
-                        if (serverData.questions && serverData.questions.length > 0) window.DB.questions = unionById(window.DB.questions, serverData.questions);
+                        // PELAYAN ialah sumber benar — rekod yang dipadam di Sheets turut hilang di peranti.
+                        // (Data tempatan hanya digunakan bila pelayan gagal dicapai / offline.)
+                        if (serverData.students) window.DB.students = serverData.students;
+                        if (serverData.programs) window.DB.programs = serverData.programs;
+                        if (serverData.classes) window.DB.classes = serverData.classes;
+                        if (serverData.studentProgress) window.DB.studentProgress = serverData.studentProgress;
+                        if (serverData.galleries) window.DB.galleries = serverData.galleries;
+                        if (serverData.users) window.DB.users = serverData.users;
+                        if (serverData.departments) window.DB.departments = serverData.departments;
+                        if (serverData.certificates) window.DB.certificates = serverData.certificates;
+                        if (serverData.faceDescriptors) window.DB.faceDescriptors = serverData.faceDescriptors;
+                        if (serverData.attendance) window.DB.attendance = serverData.attendance;
+                        if (serverData.announcements) window.DB.announcements = serverData.announcements;
+                        if (serverData.donations) window.DB.donations = serverData.donations;
+                        if (serverData.feedback) window.DB.feedback = serverData.feedback;
+                        if (serverData.excusedAbsences) window.DB.excusedAbsences = serverData.excusedAbsences;
+                        if (serverData.pendingMembers) window.DB.pendingMembers = serverData.pendingMembers;
+                        if (serverData.questions) window.DB.questions = serverData.questions;
+                        window.persistDB();
                         // Kawalan paparan dari Sheets (jika disimpan sebagai JSON)
                         if (serverData.displayControl) {
                             try {
@@ -6415,8 +6417,12 @@
         };
 
         // Bina FaceMatcher dari descriptor yang tersimpan
+        // PENTING: hanya pelajar sesi & tahun semasa — pelajar sesi lepas tidak dibandingkan
         const buildFaceMatcher = () => {
-            const descriptors = DB.faceDescriptors || [];
+            const sesiSemasa = new Set((DB.students || [])
+                .filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession)
+                .map(s => String(s.id)));
+            const descriptors = (DB.faceDescriptors || []).filter(d => sesiSemasa.has(String(d.studentId)));
             const labeled = descriptors.map(d => {
                 try {
                     const arr = typeof d.descriptor === 'string' ? JSON.parse(d.descriptor) : d.descriptor;
@@ -6515,9 +6521,13 @@
 
         // AUTO-PENDAFTARAN WAJAH: jana descriptor dari gambar pendaftaran pelajar
         // (pelajar yang sudah muat naik gambar tidak perlu daftar wajah berasingan)
+        // PENTING: hanya pelajar sesi & tahun semasa — pelajar sesi lepas tidak diproses
         window.autoEnrollFromPhotos = async (onProgress) => {
             const existing = new Set((DB.faceDescriptors || []).map(d => String(d.studentId)));
-            const targets = (DB.students || []).filter(s => s.image && !existing.has(String(s.id)));
+            const targets = (DB.students || []).filter(s =>
+                s.image && !existing.has(String(s.id)) &&
+                String(s.year) === String(state.filterYear) && s.session === state.filterSession
+            );
             if (!targets.length) return { done: 0, total: 0 };
             let done = 0, failed = 0;
             for (let i = 0; i < targets.length; i++) {
@@ -6557,9 +6567,12 @@
                 await window.loadFaceModels();
                 buildFaceMatcher();
 
-                // AUTO-PENDAFTARAN: jika ada pelajar bergambar tanpa data wajah, jana dari gambar pendaftaran
+                // AUTO-PENDAFTARAN: jika ada pelajar SESI SEMASA bergambar tanpa data wajah, jana dari gambar pendaftaran
                 const existingSet = new Set((DB.faceDescriptors || []).map(d => String(d.studentId)));
-                const perluDaftar = (DB.students || []).filter(s => s.image && !existingSet.has(String(s.id))).length;
+                const perluDaftar = (DB.students || []).filter(s =>
+                    s.image && !existingSet.has(String(s.id)) &&
+                    String(s.year) === String(state.filterYear) && s.session === state.filterSession
+                ).length;
                 if (perluDaftar > 0) {
                     if (statusEl) statusEl.textContent = 'Menjana data wajah dari gambar pendaftaran...';
                     showToast(`Menjana data wajah ${perluDaftar} pelajar dari gambar pendaftaran (sekali sahaja)...`, 'info');
