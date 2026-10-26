@@ -274,12 +274,14 @@
                     'admin-notifications': true,
                     'admin-attendance': true, 'admin-classes': true, 'admin-students': true,
                     'admin-gallery': true, 'admin-sijil': true, 'admin-reports': true,
+                    'admin-progress-report': true,
                     'admin-announcements': true, 'admin-donations': true, 'admin-feedback': true,
                     'admin-settings': true
                 },
                 // Kawalan akses peranan MENTOR/AJK (dikawal oleh owner di Super Dashboard)
                 guru: {
                     'admin-programs': true,   // Rekod progres mentor-mentee
+                    'admin-progress-report': true, // Laporan progres bacaan
                     'admin-gallery': true,    // Muat naik gambar program
                     'admin-attendance': false // Imbasan kehadiran (tutup secara lalai)
                 }
@@ -344,6 +346,27 @@
         window.studentCode = (s) => {
             const semN = parseInt(String(s.semester || '').replace(/\D/g, '')) || '';
             return String(s.dept || '').toUpperCase() + semN + (s.kelas || '');
+        };
+
+        // Pengendali Laporan Progres Bacaan
+        window.prTab = (t) => { state.prTab = t; state.prShow = false; router(); };
+        window.prCari = () => { state.prShow = true; router(); };
+        window.prPrint = () => { window.print(); };
+
+        // Tapis pilihan dropdown mengikut taipan (untuk senarai pelajar beratus)
+        window.filterMMSelect = (input) => {
+            const q = input.value.trim().toLowerCase();
+            const sel = input.parentElement.querySelector('select');
+            if (!sel) return;
+            let kelihatan = 0, terakhir = null;
+            [...sel.options].forEach(o => {
+                if (!o.value) return;
+                const m = o.textContent.toLowerCase().includes(q);
+                o.hidden = !m;
+                if (m) { kelihatan++; terakhir = o; }
+            });
+            // Auto pilih jika hanya satu sepadan
+            if (kelihatan === 1 && terakhir) sel.value = terakhir.value;
         };
 
         // Sel nama boleh klik → biodata penuh; kod + telefon di bawah nama
@@ -2025,6 +2048,7 @@
                             <form onsubmit="window.saveProgressForm(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentee / Pelajar</label>
+                                    <input type="text" placeholder="🔍 Cari nama mentee..." class="w-full border rounded-xl p-2.5 text-xs bg-white focus:ring-2 focus:ring-primary-500 outline-none mb-1.5" oninput="window.filterMMSelect(this)">
                                     <select name="mentee" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
                                         <option value="">-- Pilih Mentee --</option>
                                         ${currentSessionStudents.map(s => `<option value="${s.name}">${s.name} (${s.dept} - ${s.semester})</option>`).join('')}
@@ -2032,7 +2056,11 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentor</label>
-                                    <input type="text" name="mentor" placeholder="Nama Mentor / Guru" class="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                    <input type="text" placeholder="🔍 Cari nama mentor..." class="w-full border rounded-xl p-2.5 text-xs bg-white focus:ring-2 focus:ring-primary-500 outline-none mb-1.5" oninput="window.filterMMSelect(this)">
+                                    <select name="mentor" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                        <option value="">-- Pilih Mentor --</option>
+                                        ${currentSessionStudents.map(s => `<option value="${s.name}">${s.name} (${s.dept} - ${s.semester})</option>`).join('')}
+                                    </select>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Fasi / Guru</label>
@@ -2052,6 +2080,14 @@
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Tarikh Kelas</label>
                                     <input type="date" name="date" value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Masa Kelas</label>
+                                    <input type="time" name="time" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Kelas <span class="font-normal text-gray-400">(pilihan)</span></label>
+                                    <input type="file" name="progImage" accept="image/*" class="w-full border rounded-xl p-2.5 text-sm bg-gray-50">
                                 </div>
                                 <div class="flex items-end">
                                     <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
@@ -2096,7 +2132,7 @@
                                                     </span>
                                                 </td>
                                                 <td class="px-6 py-4 font-black text-primary-700">${p.progress}</td>` : ''}
-                                                <td class="px-6 py-4 text-right text-gray-500 font-medium text-xs">${formatDate(p.lastUpdate)}</td>
+                                                <td class="px-6 py-4 text-right text-gray-500 font-medium text-xs">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
                                             </tr>
                                         `).join('') || `<tr><td colspan="${state.currentUser ? 6 : 4}" class="text-center py-10 text-gray-500 italic bg-gray-50/50">Belum ada rekod progres bagi sesi ini.</td></tr>`}
                                     </tbody>
@@ -2184,6 +2220,7 @@
                             <form onsubmit="window.saveProgressForm(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentee / Pelajar</label>
+                                    <input type="text" placeholder="🔍 Cari nama mentee..." class="w-full border rounded-xl p-2.5 text-xs bg-white focus:ring-2 focus:ring-primary-500 outline-none mb-1.5" oninput="window.filterMMSelect(this)">
                                     <select name="mentee" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
                                         <option value="">-- Pilih Mentee --</option>
                                         ${currentSessionStudents.map(s => `<option value="${s.name}">${s.name} (${s.dept} - ${s.semester})</option>`).join('')}
@@ -2191,7 +2228,11 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentor</label>
-                                    <input type="text" name="mentor" placeholder="Nama Mentor / Guru" class="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                    <input type="text" placeholder="🔍 Cari nama mentor..." class="w-full border rounded-xl p-2.5 text-xs bg-white focus:ring-2 focus:ring-primary-500 outline-none mb-1.5" oninput="window.filterMMSelect(this)">
+                                    <select name="mentor" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                        <option value="">-- Pilih Mentor --</option>
+                                        ${currentSessionStudents.map(s => `<option value="${s.name}">${s.name} (${s.dept} - ${s.semester})</option>`).join('')}
+                                    </select>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Fasi / Guru</label>
@@ -2211,6 +2252,14 @@
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700 mb-1">Tarikh Kelas</label>
                                     <input type="date" name="date" value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Masa Kelas</label>
+                                    <input type="time" name="time" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Kelas <span class="font-normal text-gray-400">(pilihan)</span></label>
+                                    <input type="file" name="progImage" accept="image/*" class="w-full border rounded-xl p-2.5 text-sm bg-gray-50">
                                 </div>
                                 <div class="flex items-end">
                                     <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
@@ -2255,7 +2304,7 @@
                                                     </span>
                                                 </td>
                                                 <td class="px-6 py-4 font-black text-primary-700">${p.progress}</td>` : ''}
-                                                <td class="px-6 py-4 text-right text-gray-500 font-medium text-xs">${formatDate(p.lastUpdate)}</td>
+                                                <td class="px-6 py-4 text-right text-gray-500 font-medium text-xs">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
                                             </tr>
                                         `).join('') || `<tr><td colspan="${state.currentUser ? 6 : 4}" class="text-center py-10 text-gray-500 italic bg-gray-50/50">Belum ada rekod progres bagi sesi ini.</td></tr>`}
                                     </tbody>
@@ -3360,6 +3409,223 @@
                 `, 'admin-promote');
             },
 
+            // ============ LAPORAN PROGRES BACAAN MENTEE ============
+            AdminProgressReport: async () => {
+                const prog = (DB.studentProgress || []).filter(p => String(p.year) === String(state.filterYear) && p.session === state.filterSession);
+                const students = DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession);
+                const tab = state.prTab || 'keseluruhan';
+
+                const deptOf = (nama) => {
+                    const st = students.find(s => String(s.name).toLowerCase() === String(nama || '').toLowerCase());
+                    return st ? st.dept : 'Lain-lain';
+                };
+
+                const tabBtn = (id, label, icon) => `<button onclick="window.prTab('${id}')" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${tab === id ? 'bg-primary-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"><i class="fas ${icon}"></i>${label}</button>`;
+
+                let body = '';
+
+                // ---------- TAB 1: KESELURUHAN MENGIKUT JABATAN ----------
+                if (tab === 'keseluruhan') {
+                    const byDept = {};
+                    prog.forEach(p => {
+                        const d = deptOf(p.mentee);
+                        if (!byDept[d]) byDept[d] = { mentee: new Set(), rekod: 0, quran: 0, iqra: 0, terkini: {} };
+                        byDept[d].mentee.add(String(p.mentee));
+                        byDept[d].rekod++;
+                        if ((p.level || '').toLowerCase().includes('iqra')) byDept[d].iqra++; else byDept[d].quran++;
+                        const t = String(p.lastUpdate || '');
+                        if (!byDept[d].terkini[p.mentee] || t > String(byDept[d].terkini[p.mentee].lastUpdate || '')) byDept[d].terkini[p.mentee] = p;
+                    });
+                    const depts = Object.keys(byDept).sort();
+                    body = `
+                    <div id="printable-report">
+                        <div class="print-header" style="text-align:center; margin-bottom:16px;">
+                            <h2 style="font-size:18px; font-weight:900;">Laporan Progres Bacaan Mentee — Keseluruhan Mengikut Jabatan</h2>
+                            <p style="font-size:12px; color:#555;">${DB.settings.surauName} · Sesi ${state.filterSession === 'jan-jun' ? 'Januari–Jun' : 'Julai–Disember'} ${state.filterYear}</p>
+                        </div>
+                        ${depts.length === 0 ? '<div class="bg-gray-50 border rounded-2xl p-10 text-center text-gray-500 italic">Tiada rekod progres bagi sesi ini.</div>' : `
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                            <div class="bg-primary-50 border border-primary-200 rounded-2xl p-4 text-center"><p class="text-2xl font-black text-primary-700">${new Set(prog.map(p => p.mentee)).size}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Mentee Aktif</p></div>
+                            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center"><p class="text-2xl font-black text-blue-700">${new Set(prog.map(p => p.mentor)).size}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Mentor Terlibat</p></div>
+                            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center"><p class="text-2xl font-black text-amber-700">${prog.length}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Jumlah Rekod</p></div>
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center"><p class="text-2xl font-black text-emerald-700">${depts.length}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Jabatan</p></div>
+                        </div>
+                        <div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jabatan</th>
+                                    <th class="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase">Mentee Aktif</th>
+                                    <th class="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase">Jumlah Rekod</th>
+                                    <th class="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase">Al-Quran</th>
+                                    <th class="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase">Iqra'</th>
+                                </tr></thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${depts.map(d => `<tr class="hover:bg-gray-50">
+                                        <td class="px-5 py-3 font-black text-gray-900">${d}</td>
+                                        <td class="px-5 py-3 text-center font-bold text-primary-700">${byDept[d].mentee.size}</td>
+                                        <td class="px-5 py-3 text-center font-bold">${byDept[d].rekod}</td>
+                                        <td class="px-5 py-3 text-center"><span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">${byDept[d].quran}</span></td>
+                                        <td class="px-5 py-3 text-center"><span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">${byDept[d].iqra}</span></td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-5 bg-white border rounded-2xl shadow-sm overflow-hidden">
+                            <div class="p-4 bg-gray-50 border-b font-bold text-gray-700 text-sm"><i class="fas fa-list mr-2"></i>Pencapaian Terkini Setiap Mentee</div>
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Mentee</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jabatan</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tahap</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Pencapaian Terkini</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Mentor</th>
+                                    <th class="px-5 py-3 text-right text-xs font-bold text-gray-500 uppercase">Tarikh</th>
+                                </tr></thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${depts.flatMap(d => Object.values(byDept[d].terkini)).sort((a, b) => String(a.mentee).localeCompare(String(b.mentee))).map(p => `<tr class="hover:bg-gray-50">
+                                        <td class="px-5 py-3">${window.personCell(p.mentee, { avatar: true })}</td>
+                                        <td class="px-5 py-3 text-gray-600">${deptOf(p.mentee)}</td>
+                                        <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-bold ${p.level === 'Al-Quran' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${p.level || '-'}</span></td>
+                                        <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
+                                        <td class="px-5 py-3 text-gray-600">${p.mentor || '-'}</td>
+                                        <td class="px-5 py-3 text-right text-xs text-gray-500">${formatDate(p.lastUpdate)}${p.time ? ' · ' + p.time : ''}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>`}
+                    </div>`;
+                }
+
+                // ---------- TAB 2: INDIVIDU MENTEE ----------
+                else if (tab === 'mentee') {
+                    const depts = [...new Set(students.map(s => s.dept))].sort();
+                    const sems = state.prDept ? [...new Set(students.filter(s => s.dept === state.prDept).map(s => s.semester))].sort() : [];
+                    const ments = (state.prDept && state.prSem) ? students.filter(s => s.dept === state.prDept && s.semester === state.prSem) : [];
+                    const sel = state.prStudent ? students.find(s => String(s.id) === String(state.prStudent)) : null;
+                    const rekod = sel ? prog.filter(p => String(p.mentee).toLowerCase() === String(sel.name).toLowerCase()).sort((a, b) => String(a.lastUpdate).localeCompare(String(b.lastUpdate))) : [];
+                    body = `
+                    <div class="bg-white border rounded-2xl shadow-sm p-5 mb-5 no-print">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                            <div><label class="block text-xs font-bold text-gray-700 mb-1">Jabatan</label>
+                                <select onchange="state.prDept=this.value; state.prSem=''; state.prStudent=''; router()" class="w-full border rounded-xl p-3 text-sm bg-gray-50"><option value="">-- Pilih Jabatan --</option>${depts.map(d => `<option ${state.prDept === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+                            <div><label class="block text-xs font-bold text-gray-700 mb-1">Semester</label>
+                                <select onchange="state.prSem=this.value; state.prStudent=''; router()" class="w-full border rounded-xl p-3 text-sm bg-gray-50" ${!state.prDept ? 'disabled' : ''}><option value="">-- Pilih Semester --</option>${sems.map(sm => `<option ${state.prSem === sm ? 'selected' : ''}>${sm}</option>`).join('')}</select></div>
+                            <div><label class="block text-xs font-bold text-gray-700 mb-1">Pelajar (Mentee)</label>
+                                <select onchange="state.prStudent=this.value" class="w-full border rounded-xl p-3 text-sm bg-gray-50" ${!state.prSem ? 'disabled' : ''}><option value="">-- Pilih Pelajar --</option>${ments.map(s => `<option value="${s.id}" ${String(state.prStudent) === String(s.id) ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
+                            <div><button onclick="window.prCari()" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition"><i class="fas fa-search mr-1"></i> Cari</button></div>
+                        </div>
+                    </div>
+                    ${sel && state.prShow ? `
+                    <div id="printable-report">
+                        <div class="print-header" style="text-align:center; margin-bottom:16px;">
+                            <h2 style="font-size:18px; font-weight:900;">Laporan Individu Progres Bacaan Mentee</h2>
+                            <p style="font-size:12px; color:#555;">${DB.settings.surauName} · Sesi ${state.filterSession === 'jan-jun' ? 'Januari–Jun' : 'Julai–Disember'} ${state.filterYear}</p>
+                        </div>
+                        <div class="bg-white border rounded-2xl shadow-sm p-5 mb-4 flex items-center gap-4">
+                            <img src="${sel.image || 'https://placehold.co/80x80/059669/ffffff?text=' + encodeURIComponent((sel.name || '?').slice(0, 2))}" class="w-16 h-16 rounded-full object-cover border-2 border-primary-100">
+                            <div>
+                                <p class="font-black text-gray-900 text-lg">${sel.name}</p>
+                                <p class="text-xs text-gray-500 font-bold">${window.studentCode(sel)} · ${sel.semester} · Tahap: ${sel.level || '-'}</p>
+                                <p class="text-xs text-gray-500">${rekod.length} rekod bacaan direkodkan</p>
+                            </div>
+                        </div>
+                        ${rekod.length === 0 ? '<div class="bg-gray-50 border rounded-2xl p-8 text-center text-gray-500 italic">Tiada rekod bacaan untuk pelajar ini.</div>' : `
+                        <div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">#</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tarikh</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Masa</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tahap</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Pencapaian</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Mentor</th>
+                                    <th class="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase">Gambar</th>
+                                </tr></thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${rekod.map((p, i) => `<tr class="hover:bg-gray-50">
+                                        <td class="px-5 py-3 text-gray-400 font-bold">${i + 1}</td>
+                                        <td class="px-5 py-3 text-gray-600 whitespace-nowrap">${formatDate(p.lastUpdate)}</td>
+                                        <td class="px-5 py-3 text-gray-600">${p.time || '-'}</td>
+                                        <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-bold ${p.level === 'Al-Quran' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${p.level || '-'}</span></td>
+                                        <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
+                                        <td class="px-5 py-3 text-gray-600">${p.mentor || '-'}</td>
+                                        <td class="px-5 py-3 text-center">${p.image ? `<img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-8 h-8 rounded-lg object-cover border cursor-zoom-in" loading="lazy">` : '-'}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>`}
+                    </div>` : ''}`;
+                }
+
+                // ---------- TAB 3: INDIVIDU MENTOR ----------
+                else {
+                    const mentors = [...new Set(prog.map(p => String(p.mentor || '').trim()).filter(Boolean))].sort();
+                    const m = state.prMentor || '';
+                    const rekodM = m ? prog.filter(p => String(p.mentor) === m) : [];
+                    const menteeMap = {};
+                    rekodM.forEach(p => {
+                        if (!menteeMap[p.mentee] || String(p.lastUpdate) > String(menteeMap[p.mentee].lastUpdate)) menteeMap[p.mentee] = p;
+                    });
+                    const menteeList = Object.values(menteeMap).sort((a, b) => String(a.mentee).localeCompare(String(b.mentee)));
+                    body = `
+                    <div class="bg-white border rounded-2xl shadow-sm p-5 mb-5 no-print">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                            <div class="md:col-span-2"><label class="block text-xs font-bold text-gray-700 mb-1">Mentor</label>
+                                <select onchange="state.prMentor=this.value" class="w-full border rounded-xl p-3 text-sm bg-gray-50"><option value="">-- Pilih Mentor --</option>${mentors.map(x => `<option value="${x}" ${m === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+                            <div><button onclick="window.prCari()" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition"><i class="fas fa-search mr-1"></i> Cari</button></div>
+                        </div>
+                    </div>
+                    ${m && state.prShow ? `
+                    <div id="printable-report">
+                        <div class="print-header" style="text-align:center; margin-bottom:16px;">
+                            <h2 style="font-size:18px; font-weight:900;">Laporan Individu Mentor</h2>
+                            <p style="font-size:12px; color:#555;">${DB.settings.surauName} · Sesi ${state.filterSession === 'jan-jun' ? 'Januari–Jun' : 'Julai–Disember'} ${state.filterYear}</p>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3 mb-4">
+                            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center"><p class="text-2xl font-black text-amber-700">${rekodM.length}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Jumlah Rekod</p></div>
+                            <div class="bg-primary-50 border border-primary-200 rounded-2xl p-4 text-center"><p class="text-2xl font-black text-primary-700">${menteeList.length}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Mentee Bimbingan</p></div>
+                            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center"><p class="text-sm font-black text-blue-700 leading-tight pt-1">${m}</p><p class="text-[10px] font-bold text-gray-500 uppercase mt-1">Mentor</p></div>
+                        </div>
+                        <div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Mentee</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jabatan</th>
+                                    <th class="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase">Bil. Rekod</th>
+                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Pencapaian Terkini</th>
+                                    <th class="px-5 py-3 text-right text-xs font-bold text-gray-500 uppercase">Tarikh Terkini</th>
+                                </tr></thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${menteeList.map(p => `<tr class="hover:bg-gray-50">
+                                        <td class="px-5 py-3">${window.personCell(p.mentee, { avatar: true })}</td>
+                                        <td class="px-5 py-3 text-gray-600">${deptOf(p.mentee)}</td>
+                                        <td class="px-5 py-3 text-center font-bold text-amber-700">${rekodM.filter(x => x.mentee === p.mentee).length}</td>
+                                        <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
+                                        <td class="px-5 py-3 text-right text-xs text-gray-500">${formatDate(p.lastUpdate)}${p.time ? ' · ' + p.time : ''}</td>
+                                    </tr>`).join('') || '<tr><td colspan="5" class="text-center py-8 text-gray-500 italic">Tiada rekod.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>` : ''}`;
+                }
+
+                // (Carta agihan jabatan & tahap sudah dipapar di bahagian atas laporan — tidak diulang di sini)
+
+                return `
+                    <div class="bg-white rounded-2xl border shadow-sm p-5">
+                        <div class="flex justify-between items-center mb-4 flex-wrap gap-3 border-b pb-4">
+                            <h3 class="font-bold text-xs text-gray-500 uppercase tracking-wider flex items-center gap-2"><i class="fas fa-book-reader text-primary-600"></i>Progres Bacaan Mentee — Keseluruhan & Individu</h3>
+                            <button onclick="window.prPrint()" class="no-print bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded-xl text-xs transition flex items-center gap-2"><i class="fas fa-print"></i> Cetak</button>
+                        </div>
+                        <div class="flex gap-2 mb-5 flex-wrap no-print">
+                            ${tabBtn('keseluruhan', 'Keseluruhan (Jabatan)', 'fa-building')}
+                            ${tabBtn('mentee', 'Individu Mentee', 'fa-user-graduate')}
+                            ${tabBtn('mentor', 'Individu Mentor', 'fa-chalkboard-teacher')}
+                        </div>
+                        ${body}
+                    </div>`;
+            },
+
             AdminPrograms: async () => {
                 const list = DB.programs.filter(p => String(p.year) === String(state.filterYear) && p.session === state.filterSession);
                 const classes = DB.classes.filter(c => String(c.year) === String(state.filterYear) && c.session === state.filterSession);
@@ -3421,6 +3687,7 @@
                         <form onsubmit="window.saveProgressForm(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentee / Pelajar</label>
+                                <input type="text" placeholder="🔍 Cari nama mentee..." class="w-full border rounded-xl p-2.5 text-xs bg-white focus:ring-2 focus:ring-primary-500 outline-none mb-1.5" oninput="window.filterMMSelect(this)">
                                 <select name="mentee" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
                                     <option value="">-- Pilih Mentee --</option>
                                     ${DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession).map(s => `<option value="${s.name}">${s.name} (${s.dept} - ${s.semester})</option>`).join('')}
@@ -3428,7 +3695,11 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Nama Mentor</label>
-                                <input type="text" name="mentor" placeholder="Nama Mentor / Guru" class="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                <input type="text" placeholder="🔍 Cari nama mentor..." class="w-full border rounded-xl p-2.5 text-xs bg-white focus:ring-2 focus:ring-primary-500 outline-none mb-1.5" oninput="window.filterMMSelect(this)">
+                                <select name="mentor" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                                    <option value="">-- Pilih Mentor --</option>
+                                    ${DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession).map(s => `<option value="${s.name}">${s.name} (${s.dept} - ${s.semester})</option>`).join('')}
+                                </select>
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Nama Fasi / Guru</label>
@@ -3448,6 +3719,14 @@
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Tarikh Kelas</label>
                                 <input type="date" name="date" value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Masa Kelas</label>
+                                <input type="time" name="time" class="w-full border rounded-xl p-3 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Gambar Kelas <span class="font-normal text-gray-400">(pilihan)</span></label>
+                                <input type="file" name="progImage" accept="image/*" class="w-full border rounded-xl p-2.5 text-sm bg-gray-50">
                             </div>
                             <div class="flex items-end">
                                 <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2">
@@ -3481,7 +3760,7 @@
                                             <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor)}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
-                                            <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}</span></td>
+                                            <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}</span>${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
                                             <td class="px-6 py-4 text-right"><button onclick="window.confirmDelete('studentProgress', '${p.id}')" class="text-red-600 hover:bg-red-50 p-2 rounded-lg transition"><i class="fas fa-trash"></i></button></td>
                                         </tr>
                                     `).join('') || '<tr><td colspan="6" class="px-6 py-10 text-center text-gray-500 bg-gray-50/50">Tiada rekod progres bagi sesi ini. Guru/mentor boleh merekod di halaman Kelas paparan awam.</td></tr>'}
@@ -3620,7 +3899,7 @@
                                             <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor)}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
-                                            <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}</span></td>
+                                            <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}</span>${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
                                             <td class="px-6 py-4 text-right"><button onclick="window.confirmDelete('studentProgress', '${p.id}')" class="text-red-600 hover:bg-red-50 p-2 rounded-lg transition"><i class="fas fa-trash"></i></button></td>
                                         </tr>
                                     `).join('') || '<tr><td colspan="6" class="px-6 py-10 text-center text-gray-500 bg-gray-50/50">Tiada rekod progres bagi sesi ini.</td></tr>'}
@@ -3873,9 +4152,25 @@
                             <p style="font-size:11px; color:#555;">${DB.settings.address} · ${DB.settings.phone}</p>
                         </div>
                         <div class="text-center">
-                            <h2 class="text-xl font-bold text-gray-900 border-b pb-3">Laporan Prestasi & Kehadiran Mentee (${session.toUpperCase()} ${year})</h2>
+                            <h2 class="text-xl font-bold text-gray-900 border-b pb-3">Laporan Prestasi, Kehadiran & Progres Bacaan Mentee (${session.toUpperCase()} ${year})</h2>
                             <p class="text-xs text-gray-500 mt-1">Dicetak pada ${formatDate(new Date().toISOString().split('T')[0])} oleh ${state.currentUser ? state.currentUser.name : ''}</p>
                         </div>
+
+                        <!-- Carta Kehadiran Setiap Program (di atas sekali) -->
+                        <div class="bg-white p-6 rounded-2xl border shadow-sm mt-6">
+                            <div class="flex flex-wrap justify-between items-center gap-3 mb-5 border-b pb-4">
+                                <h3 class="font-bold text-xs text-gray-500 uppercase tracking-wider flex items-center gap-2"><i class="fas fa-chart-line text-primary-600"></i>Carta Kehadiran Setiap Program</h3>
+                                <select onchange="window.renderProgramReport(this.value)" class="border rounded-xl px-3 py-2 text-sm font-bold bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none max-w-full">
+                                    <option value="">-- Pilih Program --</option>
+                                    <option value="PMI_ALL">PMI — Keseluruhan Semester (${window.getPMIWeeks(year, session).length} minggu)</option>
+                                    ${DB.programs.filter(p => String(p.year) === String(year) && p.session === session).map(p => `<option value="${p.id}">${p.title} (${formatDate(p.date)})</option>`).join('')}
+                                </select>
+                            </div>
+                            <div id="program-report-body">
+                                <p class="text-center text-gray-400 text-sm italic py-10">Pilih program di atas untuk melihat carta kehadiran (hadir / tidak hadir / bersebab).</p>
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div class="bg-white p-6 rounded-2xl border shadow-sm">
                                 <h3 class="font-bold mb-6 text-xs text-gray-500 uppercase tracking-wider">Purata Penglibatan Mentee Mengikut Jabatan (%)</h3>
@@ -3891,20 +4186,8 @@
                             </div>
                         </div>
 
-                        <!-- Laporan Kehadiran Setiap Program -->
-                        <div class="bg-white p-6 rounded-2xl border shadow-sm">
-                            <div class="flex flex-wrap justify-between items-center gap-3 mb-5 border-b pb-4">
-                                <h3 class="font-bold text-xs text-gray-500 uppercase tracking-wider flex items-center gap-2"><i class="fas fa-chart-line text-primary-600"></i>Carta Kehadiran Setiap Program</h3>
-                                <select onchange="window.renderProgramReport(this.value)" class="border rounded-xl px-3 py-2 text-sm font-bold bg-gray-50 focus:ring-2 focus:ring-primary-500 outline-none max-w-full">
-                                    <option value="">-- Pilih Program --</option>
-                                    <option value="PMI_ALL">PMI — Keseluruhan Semester (${window.getPMIWeeks(year, session).length} minggu)</option>
-                                    ${DB.programs.filter(p => String(p.year) === String(year) && p.session === session).map(p => `<option value="${p.id}">${p.title} (${formatDate(p.date)})</option>`).join('')}
-                                </select>
-                            </div>
-                            <div id="program-report-body">
-                                <p class="text-center text-gray-400 text-sm italic py-10">Pilih program di atas untuk melihat carta kehadiran (hadir / tidak hadir / bersebab).</p>
-                            </div>
-                        </div>
+                        <!-- Laporan Progres Bacaan Mentee (keseluruhan jabatan / individu mentee / individu mentor) -->
+                        ${await Views.AdminProgressReport()}
                     </div>
                 `, 'admin-reports');
             },
@@ -4063,7 +4346,13 @@
 
             AdminAttendance: async () => {
                 const programs = DB.programs.filter(p => String(p.year) === String(state.filterYear) && p.session === state.filterSession && p.status === 'Published');
-                const attendance = DB.attendance || [];
+                // Tapis kehadiran kepada sesi semasa sahaja
+                const sesiIdsAtt = new Set(DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession).map(s => String(s.id)));
+                const attendance = (DB.attendance || []).filter(a => {
+                    if (sesiIdsAtt.has(String(a.studentId))) return true;
+                    if (a.year && a.session) return String(a.year) === String(state.filterYear) && a.session === state.filterSession;
+                    return false;
+                });
                 const descriptors = DB.faceDescriptors || [];
 
                 // === PMI: jadual mingguan setiap Jumaat (auto mengikut sesi semasa) ===
@@ -4213,8 +4502,15 @@
             },
 
             AdminAttendanceReport: async () => {
-                const attendance = DB.attendance || [];
                 const allStudents = DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession);
+                // Tapis rekod kehadiran kepada sesi semasa sahaja — elak data sesi lepas/yatim celaru
+                const sesiIds = new Set(allStudents.map(s => String(s.id)));
+                const attendance = (DB.attendance || []).filter(a => {
+                    if (sesiIds.has(String(a.studentId))) return true;
+                    if (a.year && a.session) return String(a.year) === String(state.filterYear) && a.session === state.filterSession;
+                    return false;
+                });
+                const excusedSesi = (DB.excusedAbsences || []).filter(e => sesiIds.has(String(e.studentId)) || (e.year && e.session && String(e.year) === String(state.filterYear) && e.session === state.filterSession));
                 const programs = DB.programs.filter(p => String(p.year) === String(state.filterYear) && p.session === state.filterSession);
                 const pmiWeeks = window.getPMIWeeks(state.filterYear, state.filterSession);
 
@@ -4229,7 +4525,7 @@
                     const attended = attendance.filter(a => String(a.programId) === String(selProgram.id));
                     const attendedIds = new Set(attended.map(a => String(a.studentId)));
                     // Tidak hadir bersebab (MC/exam/dll) diasingkan dari tidak hadir biasa
-                    const excusedList = (DB.excusedAbsences || []).filter(e => String(e.programId) === String(selProgram.id));
+                    const excusedList = excusedSesi.filter(e => String(e.programId) === String(selProgram.id));
                     const excusedIds = new Set(excusedList.map(e => String(e.studentId)));
                     const absent = students.filter(s => !attendedIds.has(String(s.id)) && !excusedIds.has(String(s.id)));
 
@@ -5393,7 +5689,10 @@
             const level = form.elements['level'] ? form.elements['level'].value : 'Al-Quran';
             const progress = form.elements['progress'].value;
             const date = form.elements['date'] ? form.elements['date'].value : new Date().toISOString().split('T')[0];
+            const time = form.elements['time'] ? form.elements['time'].value : '';
+            const fileImg = form.elements['progImage'] && form.elements['progImage'].files ? form.elements['progImage'].files[0] : null;
 
+            const hantar = (imgData) => {
             const formData = { 
                 mentee, 
                 mentor, 
@@ -5401,6 +5700,8 @@
                 level, 
                 progress, 
                 date, 
+                time,
+                image: imgData || '',
                 year: state.filterYear, 
                 session: state.filterSession,
                 updatedBy: actorName()
@@ -5415,6 +5716,8 @@
                     fasi, 
                     level, 
                     progress, 
+                    time,
+                    image: imgData || '',
                     lastUpdate: date, 
                     year: state.filterYear, 
                     session: state.filterSession 
@@ -5435,6 +5738,8 @@
                             fasi, 
                             level, 
                             progress, 
+                            time,
+                            image: result.image || formData.image || '',
                             lastUpdate: date, 
                             year: state.filterYear, 
                             session: state.filterSession 
@@ -5447,6 +5752,8 @@
                             fasi, 
                             level, 
                             progress, 
+                            time,
+                            image: formData.image || '',
                             lastUpdate: date, 
                             year: state.filterYear, 
                             session: state.filterSession 
@@ -5460,6 +5767,30 @@
                     showToast('Ralat menyimpan progres: ' + (err.message || err), 'error');
                 })
                 .submitProgress(formData);
+            }; // akhir fungsi hantar
+
+            // Baca & mampatkan gambar (jika dipilih), kemudian hantar
+            if (fileImg) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const maks = 640;
+                        const nisbah = Math.min(1, maks / Math.max(img.width, img.height));
+                        canvas.width = Math.round(img.width * nisbah);
+                        canvas.height = Math.round(img.height * nisbah);
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                        hantar(canvas.toDataURL('image/jpeg', 0.8));
+                    };
+                    img.onerror = () => hantar(ev.target.result);
+                    img.src = ev.target.result;
+                };
+                reader.onerror = () => hantar('');
+                reader.readAsDataURL(fileImg);
+            } else {
+                hantar('');
+            }
         };
 
         window.openGalleryModal = (id = null) => {
@@ -6894,7 +7225,7 @@
             modal.className = 'fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
             modal.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden fade-in-up">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden fade-in-up max-h-[90vh] overflow-y-auto">
                     <div class="bg-primary-900 px-6 py-4 flex items-center justify-between">
                         <p class="text-white font-black text-sm"><i class="fas fa-id-card mr-2"></i>Biodata Pelajar</p>
                         <button onclick="document.getElementById('biodata-modal').remove()" class="text-white/70 hover:text-white text-xl leading-none"><i class="fas fa-times"></i></button>
@@ -6913,9 +7244,13 @@
                             <div class="flex justify-between"><span class="text-gray-500 font-semibold"><i class="fas fa-calendar w-5 text-gray-400"></i>Sesi</span><span class="font-bold text-gray-900">${s.year || '-'} · ${(s.session || '').replace('jan-jun', 'Jan–Jun').replace('julai-dis', 'Julai–Dis')}</span></div>
                         </div>
                         ${progress.length ? `
-                        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                            <p class="text-xs font-black text-amber-800 mb-1"><i class="fas fa-chart-line mr-1"></i>Progres Mengaji</p>
-                            ${progress.map(p => `<p class="text-xs text-amber-900 font-semibold">${p.level}: ${p.progress} <span class="text-amber-600">(${formatDate(p.lastUpdate)})</span></p>`).join('')}
+                        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3 max-h-56 overflow-y-auto">
+                            <p class="text-xs font-black text-amber-800 mb-1.5"><i class="fas fa-chart-line mr-1"></i>Rekod Bacaan & Mentor (${progress.length})</p>
+                            ${progress.map(p => `<div class="text-xs text-amber-900 font-semibold border-b border-amber-100 last:border-0 py-1.5">
+                                <span class="font-black">${p.level || '-'}</span>: ${p.progress || '-'} <span class="text-amber-600">(${formatDate(p.lastUpdate)}${p.time ? ' · ' + p.time : ''})</span>
+                                <span class="block text-[10px] text-amber-700 font-bold mt-0.5"><i class="fas fa-chalkboard-teacher mr-1"></i>Mentor: ${p.mentor || '-'}</span>
+                                ${p.image ? `<img src="${p.image}" onclick="event.stopPropagation(); window.viewImage('${p.image}', 'Gambar Kelas')" class="mt-1 w-10 h-10 rounded-lg object-cover border cursor-zoom-in" loading="lazy">` : ''}
+                            </div>`).join('')}
                         </div>` : ''}
                     </div>
                 </div>`;
@@ -6942,7 +7277,7 @@
             modal.className = 'fixed inset-0 z-[100001] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
             modal.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden fade-in-up">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden fade-in-up max-h-[90vh] overflow-y-auto">
                     <div class="bg-amber-500 px-6 py-4 flex items-center justify-between">
                         <p class="text-white font-black text-sm"><i class="fas fa-notes-medical mr-2"></i>Tanda Tidak Hadir Bersebab</p>
                         <button onclick="document.getElementById('excused-modal').remove()" class="text-white/80 hover:text-white text-xl leading-none"><i class="fas fa-times"></i></button>
@@ -7710,6 +8045,7 @@
                         case 'admin-dashboard': html = await Views.AdminDashboard(); break;
                         case 'admin-notifications': html = await Views.AdminNotifications(); break;
                         case 'admin-programs': html = await Views.AdminPrograms(); break;
+                        case 'admin-progress-report': window.location.hash = 'admin-reports'; return; // digabungkan ke Laporan
                         case 'admin-classes': window.location.hash = 'admin-programs'; return; // digabungkan ke Program & Kelas
                         case 'admin-takwim': html = await Views.AdminTakwim(); break;
                         case 'admin-students': html = await Views.AdminStudents(); break;
