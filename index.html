@@ -756,7 +756,7 @@
                 if (tomorrow) target.setDate(target.getDate() + 1);
                 let diff = Math.max(0, Math.floor((target - now) / 1000));
                 const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
-                pill.innerHTML = `<i class="fas fa-moon text-emerald-300"></i> Solat seterusnya: <span class="text-emerald-300">${nextName} ${nextTime || ''}</span><span class="text-white/70 font-semibold">-${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</span>`;
+                pill.innerHTML = `<i class="fas fa-moon text-emerald-300"></i> Solat seterusnya: <span class="text-emerald-300">${nextName} ${nextTime || ''}</span><span class="text-white/70 font-semibold"> · ${h > 0 ? h + 'j ' : ''}${m}m ${s}s lagi</span>`;
                 pill.style.display = 'flex';
             };
 
@@ -2123,7 +2123,7 @@
                                         ${progressList.map(p => `
                                             <tr class="hover:bg-gray-50 transition">
                                                 <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor)}</td>
+                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
                                                 <td class="px-6 py-4 text-gray-600"><i class="fas fa-chalkboard-teacher text-gray-400 mr-1.5"></i>${p.fasi || '-'}</td>
                                                 ${state.currentUser ? `
                                                 <td class="px-6 py-4">
@@ -2295,7 +2295,7 @@
                                         ${progressList.map(p => `
                                             <tr class="hover:bg-gray-50 transition">
                                                 <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor)}</td>
+                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
                                                 <td class="px-6 py-4 text-gray-600"><i class="fas fa-chalkboard-teacher text-gray-400 mr-1.5"></i>${p.fasi || '-'}</td>
                                                 ${state.currentUser ? `
                                                 <td class="px-6 py-4">
@@ -3451,7 +3451,8 @@
                             <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center"><p class="text-2xl font-black text-emerald-700">${depts.length}</p><p class="text-[10px] font-bold text-gray-500 uppercase">Jabatan</p></div>
                         </div>
                         <div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                                 <thead class="bg-gray-50"><tr>
                                     <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jabatan</th>
                                     <th class="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase">Mentee Aktif</th>
@@ -3469,10 +3470,12 @@
                                     </tr>`).join('')}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                         <div class="mt-5 bg-white border rounded-2xl shadow-sm overflow-hidden">
                             <div class="p-4 bg-gray-50 border-b font-bold text-gray-700 text-sm"><i class="fas fa-list mr-2"></i>Pencapaian Terkini Setiap Mentee</div>
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                                 <thead class="bg-gray-50"><tr>
                                     <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Mentee</th>
                                     <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jabatan</th>
@@ -3487,11 +3490,12 @@
                                         <td class="px-5 py-3 text-gray-600">${deptOf(p.mentee)}</td>
                                         <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-bold ${p.level === 'Al-Quran' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${p.level || '-'}</span></td>
                                         <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
-                                        <td class="px-5 py-3 text-gray-600">${p.mentor || '-'}</td>
+                                        <td class="px-5 py-3">${p.mentor ? window.personCell(p.mentor, { avatar: true }) : '-'}</td>
                                         <td class="px-5 py-3 text-right text-xs text-gray-500">${formatDate(p.lastUpdate)}${p.time ? ' · ' + p.time : ''}</td>
                                     </tr>`).join('')}
                                 </tbody>
                             </table>
+                            </div>
                         </div>`}
                     </div>`;
                 }
@@ -3531,7 +3535,8 @@
                         </div>
                         ${rekod.length === 0 ? '<div class="bg-gray-50 border rounded-2xl p-8 text-center text-gray-500 italic">Tiada rekod bacaan untuk pelajar ini.</div>' : `
                         <div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                                 <thead class="bg-gray-50"><tr>
                                     <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">#</th>
                                     <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tarikh</th>
@@ -3548,11 +3553,12 @@
                                         <td class="px-5 py-3 text-gray-600">${p.time || '-'}</td>
                                         <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-bold ${p.level === 'Al-Quran' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${p.level || '-'}</span></td>
                                         <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
-                                        <td class="px-5 py-3 text-gray-600">${p.mentor || '-'}</td>
+                                        <td class="px-5 py-3">${p.mentor ? window.personCell(p.mentor, { avatar: true }) : '-'}</td>
                                         <td class="px-5 py-3 text-center">${p.image ? `<img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-8 h-8 rounded-lg object-cover border cursor-zoom-in" loading="lazy">` : '-'}</td>
                                     </tr>`).join('')}
                                 </tbody>
                             </table>
+                            </div>
                         </div>`}
                     </div>` : ''}`;
                 }
@@ -3587,7 +3593,8 @@
                             <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center"><p class="text-sm font-black text-blue-700 leading-tight pt-1">${m}</p><p class="text-[10px] font-bold text-gray-500 uppercase mt-1">Mentor</p></div>
                         </div>
                         <div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
                                 <thead class="bg-gray-50"><tr>
                                     <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Mentee</th>
                                     <th class="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jabatan</th>
@@ -3605,6 +3612,7 @@
                                     </tr>`).join('') || '<tr><td colspan="5" class="text-center py-8 text-gray-500 italic">Tiada rekod.</td></tr>'}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>` : ''}`;
                 }
@@ -3757,7 +3765,7 @@
                                     ${progress.map(p => `
                                         <tr class="hover:bg-gray-50 transition">
                                             <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor)}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
                                             <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}</span>${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
@@ -3896,7 +3904,7 @@
                                     ${progress.map(p => `
                                         <tr class="hover:bg-gray-50 transition">
                                             <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor)}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
                                             <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}</span>${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
@@ -4152,7 +4160,7 @@
                             <p style="font-size:11px; color:#555;">${DB.settings.address} · ${DB.settings.phone}</p>
                         </div>
                         <div class="text-center">
-                            <h2 class="text-xl font-bold text-gray-900 border-b pb-3">Laporan Prestasi, Kehadiran & Progres Bacaan Mentee (${session.toUpperCase()} ${year})</h2>
+                            <h2 class="text-base sm:text-xl font-bold text-gray-900 border-b pb-3">Laporan Prestasi, Kehadiran &amp; Progres Bacaan Mentee <span class="whitespace-nowrap">(${session.toUpperCase()} ${year})</span></h2>
                             <p class="text-xs text-gray-500 mt-1">Dicetak pada ${formatDate(new Date().toISOString().split('T')[0])} oleh ${state.currentUser ? state.currentUser.name : ''}</p>
                         </div>
 
