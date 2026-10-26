@@ -6697,8 +6697,14 @@
         };
 
         // Paparan besar keputusan imbasan — berjaya (5 saat, hijau) / gagal (merah + Cuba Semula) / sudah direkod (biru, 5 saat)
-        window.showScanResult = (ok, name, note) => {
+        window.showScanResult = (ok, name, note, dept) => {
             document.getElementById('scan-result-overlay')?.remove();
+            // Cari kod ringkas (JABATAN+SEM+KELAS cth: SFP1, DIK1A) jika tidak diberi
+            if (!dept && name) {
+                const st = (DB.students || []).find(s => String(s.name).toLowerCase() === String(name).toLowerCase());
+                if (st) dept = window.studentCode(st);
+            }
+            const deptLine = dept ? `<p class="text-xs font-bold text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-3 py-1 inline-block mt-1"><i class="fas fa-building mr-1"></i>${dept}</p>` : '';
             const ov = document.createElement('div');
             ov.id = 'scan-result-overlay';
             ov.className = 'fixed inset-0 z-[120000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-6 fade-in';
@@ -6706,9 +6712,10 @@
                 ov.innerHTML = `
                     <div class="bg-white rounded-3xl shadow-2xl p-10 text-center max-w-sm w-full fade-in-up">
                         <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl"><i class="fas fa-check-double"></i></div>
-                        <h2 class="text-2xl font-black text-blue-700 mb-1">SUDAH SELESAI</h2>
+                        <h2 class="text-2xl font-black text-blue-700 mb-1">SUDAH DIREKODKAN</h2>
                         <p class="text-lg font-bold text-gray-900">${name || ''}</p>
-                        <p class="text-sm text-gray-500 mt-1">Kehadiran anda telah direkodkan sebelum ini. Satu imbasan sahaja untuk setiap program.</p>
+                        ${deptLine}
+                        <p class="text-sm text-gray-500 mt-2">Kehadiran anda untuk program ini telah pun direkodkan. Terima kasih!</p>
                         <p class="text-[11px] text-gray-400 mt-4">Mesej ini akan tutup dalam 5 saat (klik untuk tutup segera)</p>
                     </div>`;
                 ov.onclick = () => ov.remove();
@@ -6720,7 +6727,8 @@
                         <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl"><i class="fas fa-check"></i></div>
                         <h2 class="text-2xl font-black text-green-700 mb-1">IMBASAN BERJAYA!</h2>
                         <p class="text-lg font-bold text-gray-900">${name || ''}</p>
-                        <p class="text-sm text-gray-500 mt-1">Kehadiran telah direkodkan${note ? ' ' + note : ''} · ${new Date().toLocaleTimeString('en-GB')}</p>
+                        ${deptLine}
+                        <p class="text-sm text-gray-500 mt-2">Kehadiran telah direkodkan${note ? ' ' + note : ''}<br><span class="font-semibold text-gray-700">${(() => { const kini = new Date(); const hari = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'][kini.getDay()]; const bulan = ['Jan','Feb','Mac','Apr','Mei','Jun','Jul','Ogos','Sep','Okt','Nov','Dis'][kini.getMonth()]; let jam = kini.getHours(); const ampm = jam >= 12 ? 'PM' : 'AM'; jam = jam % 12 || 12; const minit = String(kini.getMinutes()).padStart(2, '0'); return `${hari}, ${kini.getDate()} ${bulan} ${kini.getFullYear()} · ${jam}:${minit} ${ampm}`; })()}</span></p>
                         <p class="text-[11px] text-gray-400 mt-4">Mesej ini akan tutup dalam 5 saat (klik untuk tutup segera)</p>
                     </div>`;
                 ov.onclick = () => ov.remove();
@@ -6764,7 +6772,7 @@
             const already = (DB.attendance || []).some(a => String(a.programId) === String(programId) && String(a.studentId) === String(studentId));
             if (already) {
                 // Imbasan kali kedua untuk program sama — maklum sudah selesai (auto tutup 5 saat)
-                window.showScanResult('done', student.name);
+                window.showScanResult('done', student.name, null, window.studentCode(student));
                 return Promise.resolve(false);
             }
 
@@ -6776,10 +6784,10 @@
                                 DB.attendance.push({ id: result.id, ...formData, time: new Date().toLocaleTimeString('en-GB'), status: 'Hadir' });
                                 window.refreshScanAttendees();
                                 showToast(`${student.name} hadir!`, 'success');
-                                window.showScanResult(true, student.name);
+                                window.showScanResult(true, student.name, null, window.studentCode(student));
                             } else if (result && result.error === 'duplicate') {
                                 // sudah hadir di pelayan (imbasan kali kedua)
-                                window.showScanResult('done', student.name);
+                                window.showScanResult('done', student.name, null, window.studentCode(student));
                             }
                             resolve(true);
                         })
@@ -6791,7 +6799,7 @@
                             DB.attendance.push({ id: 'att_' + Date.now(), ...formData, time: new Date().toLocaleTimeString('en-GB'), status: 'Hadir' });
                             window.refreshScanAttendees();
                             showToast(`${student.name} hadir! (offline — akan diselaraskan)`, 'info');
-                            window.showScanResult(true, student.name, '(offline)');
+                            window.showScanResult(true, student.name, '(offline)', window.studentCode(student));
                             resolve(true);
                         })
                         .recordAttendance(formData);
@@ -6801,7 +6809,7 @@
                 DB.attendance.push({ id: 'att_' + Date.now(), ...formData, time: new Date().toLocaleTimeString('en-GB'), status: 'Hadir' });
                 window.refreshScanAttendees();
                 showToast(`${student.name} hadir!`, 'success');
-                window.showScanResult(true, student.name);
+                window.showScanResult(true, student.name, null, window.studentCode(student));
                 return Promise.resolve(true);
             }
         };
