@@ -4830,6 +4830,11 @@
                 const selProgram = window.resolveProgram(selProgramId);
                 const attendance = DB.attendance || [];
                 const attendedList = selProgram ? attendance.filter(a => String(a.programId) === String(selProgram.id)) : [];
+                // Kumpulan kelas: kod ringkas (cth DEE1A, SPE3) + bilangan pelajar
+                const sesiStudents = DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession);
+                const groupCount = {};
+                sesiStudents.forEach(s => { const k = window.studentCode(s); groupCount[k] = (groupCount[k] || 0) + 1; });
+                const groups = Object.keys(groupCount).sort();
 
                 return Views.AdminLayout(`
                     <h1 class="text-2xl font-black text-gray-900 mb-2">Imbasan Kehadiran (Pengecaman Wajah)</h1>
@@ -4862,6 +4867,16 @@
                                     </optgroup>
                                 </select>
                                 ${selProgram ? `<p id="scan-program-info" class="text-xs text-gray-500 mt-2"><i class="fas fa-calendar mr-1"></i>${formatDate(selProgram.date)} · ${selProgram.time || ''}</p>` : '<p id="scan-program-info" class="text-xs text-gray-500 mt-2"></p>'}
+                            </div>
+
+                            <div class="bg-white rounded-2xl border shadow-sm p-5 mb-4">
+                                <h3 class="font-bold text-gray-900 mb-1 border-b pb-2">Kelas / Kumpulan</h3>
+                                <p class="text-[11px] text-gray-400 mb-2"><i class="fas fa-bolt mr-1"></i>Imbasan lebih pantas & tepat — wajah dibandingkan dengan kumpulan ini sahaja</p>
+                                <select id="scan-group" onchange="window.setScanGroup(this.value)" class="w-full border rounded-xl p-3 text-sm bg-gray-50">
+                                    <option value="">Semua Pelajar (${sesiStudents.length})</option>
+                                    ${groups.map(g => `<option value="${g}" ${state.scanGroup === g ? 'selected' : ''}>${g} (${groupCount[g]} pelajar)</option>`).join('')}
+                                </select>
+                                ${state.scanGroup ? `<p class="text-xs text-primary-700 font-bold mt-2"><i class="fas fa-filter mr-1"></i>Menapis: ${state.scanGroup} sahaja</p>` : ''}
                             </div>
 
                             <div class="bg-white rounded-2xl border shadow-sm p-5">
@@ -6740,16 +6755,15 @@
             if (typeof faceapi === 'undefined') throw new Error('FaceAPI belum dimuat. Semak sambungan internet.');
             if (faceModelsLoaded) return;
             await Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL),
+                faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL), // pengesan utama — lebih tepat
                 faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
                 faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL)
             ]);
-            // MODEL LEBIH TEPAT (SsdMobilenetv1) untuk pendaftaran wajah —
-            // jika gagal dimuat (rangkaian), sistem masih berfungsi dengan TinyFaceDetector.
+            // TinyFaceDetector sebagai sandaran sahaja jika SSD gagal dimuat (rangkaian perlahan)
             try {
-                await faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL);
-                ssdModelSedia = !!faceapi.nets.ssdMobilenetv1.isLoaded;
-            } catch (e) { ssdModelSedia = false; }
+                await faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL);
+            } catch (e) { /* sandaran — abaikan jika gagal */ }
+            ssdModelSedia = !!faceapi.nets.ssdMobilenetv1.isLoaded;
             faceModelsLoaded = true;
         };
 
@@ -6757,15 +6771,22 @@
         // jatuh balik ke TinyFaceDetector bila tiada. Imbasan kehadiran tetap guna
         // TinyFaceDetector kerana lebih pantas untuk kitaran 1.5 saat.
         window.__opsiPengesanDaftar = () => {
-            if (ssdModelSedia) return new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+            if (ssdModelSedia) return new faceapi.SsdMobilenetv1Options({ minConfidence: 0.75 });
+            return new faceapi.TinyFaceDetectorOptions();
+        };
+        // Pengesan untuk IMBASAN: SsdMobilenetv1 (minConfidence 0.75) — hanya wajah jelas diproses
+        window.__opsiPengesanImbas = () => {
+            if (ssdModelSedia) return new faceapi.SsdMobilenetv1Options({ minConfidence: 0.75 });
             return new faceapi.TinyFaceDetectorOptions();
         };
 
         // Bina FaceMatcher dari descriptor yang tersimpan
         // PENTING: hanya pelajar sesi & tahun semasa — pelajar sesi lepas tidak dibandingkan
+        // Jika kelas/kumpulan dipilih (state.scanGroup), tapis lagi kepada kumpulan itu sahaja
         const buildFaceMatcher = () => {
             const sesiSemasa = new Set((DB.students || [])
                 .filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession)
+                .filter(s => !state.scanGroup || window.studentCode(s) === state.scanGroup)
                 .map(s => String(s.id)));
             const descriptors = (DB.faceDescriptors || []).filter(d => sesiSemasa.has(String(d.studentId)));
             const labeled = descriptors.map(d => {
@@ -6780,7 +6801,7 @@
             // threshold: nilai lebih kecil = lebih ketat (hanya padanan sangat rapat diterima).
             // 0.50: seimbang — 0.45 terlalu ketat di lapangan, 0.55 asal menyebabkan salah kenal
             // (muka orang lain keluar nama orang lain) dengan 230+ wajah berdaftar.
-            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.50) : null;
+            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.45) : null;
             return faceMatcher;
         };
 
@@ -6793,6 +6814,13 @@
                 const p = window.resolveProgram(id);
                 infoEl.innerHTML = p ? `<i class="fas fa-calendar mr-1"></i>${formatDate(p.date)} · ${p.time || ''}` : '';
             }
+        };
+
+        // Tapis imbasan kepada kelas/kumpulan — matcher dibina semula serta-merta
+        window.setScanGroup = (g) => {
+            state.scanGroup = g || '';
+            buildFaceMatcher();
+            if (scanActive) showToast(g ? `Menapis imbasan kepada ${g} sahaja.` : 'Menapis semua pelajar.', 'info');
         };
 
         window.selectAttendanceProgram = (id) => {
@@ -6871,7 +6899,7 @@
                 if ((DB.faceDescriptors || []).some(d => String(d.studentId) === String(student.id))) return;
                 await window.loadFaceModels();
                 const img = await faceapi.fetchImage(student.image);
-                const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+                const det = await faceapi.detectSingleFace(img, window.__opsiPengesanDaftar())
                     .withFaceLandmarks().withFaceDescriptor();
                 if (det && det.descriptor) {
                     const rec = { studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(Array.from(det.descriptor)) };
@@ -6891,7 +6919,8 @@
             const existing = new Set((DB.faceDescriptors || []).map(d => String(d.studentId)));
             const targets = (DB.students || []).filter(s =>
                 s.image && !existing.has(String(s.id)) &&
-                String(s.year) === String(state.filterYear) && s.session === state.filterSession
+                String(s.year) === String(state.filterYear) && s.session === state.filterSession &&
+                (!state.scanGroup || window.studentCode(s) === state.scanGroup)
             );
             if (!targets.length) return { done: 0, total: 0 };
             let done = 0, failed = 0;
@@ -6900,7 +6929,7 @@
                 if (onProgress) onProgress(i + 1, targets.length, s.name);
                 try {
                     const img = await faceapi.fetchImage(s.image);
-                    const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+                    const det = await faceapi.detectSingleFace(img, window.__opsiPengesanDaftar())
                         .withFaceLandmarks().withFaceDescriptor();
                     if (det && det.descriptor) {
                         const rec = { studentId: s.id, name: s.name, dept: s.dept, descriptor: JSON.stringify(Array.from(det.descriptor)) };
@@ -6937,7 +6966,8 @@
                 const existingSet = new Set((DB.faceDescriptors || []).map(d => String(d.studentId)));
                 const perluDaftar = (DB.students || []).filter(s =>
                     s.image && !existingSet.has(String(s.id)) &&
-                    String(s.year) === String(state.filterYear) && s.session === state.filterSession
+                    String(s.year) === String(state.filterYear) && s.session === state.filterSession &&
+                    (!state.scanGroup || window.studentCode(s) === state.scanGroup)
                 ).length;
                 if (perluDaftar > 0) {
                     showToast(`Menjana data wajah ${perluDaftar} pelajar di latar belakang — imbasan boleh bermula serta-merta.`, 'info');
@@ -6973,13 +7003,12 @@
                 const nameMap = {};
                 (DB.students || []).forEach(s => { nameMap[String(s.id)] = s.name; });
 
-                // Padanan seimbang: pulang 'unknown' kecuali (a) jarak ≤ 0.50, dan
+                // Padanan ketat: pulang 'unknown' kecuali (a) jarak ≤ 0.45, dan
                 // (b) padanan terbaik sekurang-kurangnya 0.04 lebih hampir daripada
                 // pelajar LAIN terdekat (elak salah kenal antara wajah serupa),
                 // dan (c) wajah cukup besar/dekat di skrin (kotak ≥ 80px).
-                // 0.50 = kompromi: 0.45 terlalu ketat di lapangan (pelajar lama
-                // berdescriptor 1-gambar lemah ditolak semua); 0.55 asal pula salah kenal.
-                const MATCH_THRESHOLD = 0.50;
+                // Jika kamera kurang pasti → 'unknown', BUKAN meneka nama pelajar lain.
+                const MATCH_THRESHOLD = 0.45; // lebih ketat — jika kamera kurang pasti, papar 'unknown' bukan teka nama lain
                 const MATCH_MARGIN = 0.04;
                 const MIN_BOX_PX = 80;
                 const matchFace = (desc) => {
@@ -7006,8 +7035,10 @@
 
                 scanInterval = setInterval(async () => {
                     if (!scanActive) return;
+                    if (window.__scanBusy) return; // SSD lebih teliti tetapi lebih berat — elak kitaran bertindih
+                    window.__scanBusy = true;
                     try {
-                        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                        const detections = await faceapi.detectAllFaces(video, window.__opsiPengesanImbas())
                             .withFaceLandmarks()
                             .withFaceDescriptors();
                         const resized = faceapi.resizeResults(detections, displaySize);
@@ -7019,6 +7050,23 @@
                         for (const det of resizedDetections) {
                             // Abaikan wajah terlalu kecil/jauh — descriptor tidak boleh dipercayai
                             if (!det.detection || !det.detection.box || det.detection.box.width < MIN_BOX_PX) continue;
+                            // SYARAT: mata mesti melihat kamera (wajah frontal) — semak landmark
+                            if (det.landmarks) {
+                                const mataKiri = det.landmarks.getLeftEye();
+                                const mataKanan = det.landmarks.getRightEye();
+                                const hidung = det.landmarks.getNose();
+                                if (!mataKiri.length || !mataKanan.length || !hidung.length) continue;
+                                // Kira sisihan hidung dari titik tengah mata — jika besar, wajah menoleh
+                                const tengahMataX = (mataKiri[0].x + mataKanan[3].x) / 2;
+                                const lebarMata = Math.abs(mataKanan[3].x - mataKiri[0].x) || 1;
+                                const sisihan = Math.abs(hidung[3].x - tengahMataX) / lebarMata;
+                                // Ketinggian mata mesti hampir sama (kepala tidak menoleh jauh ke tepi)
+                                const bezaTinggiMata = Math.abs(mataKiri[0].y - mataKanan[0].y) / lebarMata;
+                                if (sisihan > 0.18 || bezaTinggiMata > 0.15) {
+                                    new faceapi.draw.DrawBox(det.detection.box, { label: 'Sila pandang kamera', boxColor: 'orange' }).draw(canvas);
+                                    continue;
+                                }
+                            }
                             // Jika matcher belum sedia (data wajah sedang dijana di latar), lukis kotak sahaja
                             if (!faceMatcher) {
                                 new faceapi.draw.DrawBox(det.detection.box, { label: 'Menyediakan data wajah...', boxColor: 'orange' }).draw(canvas);
@@ -7051,6 +7099,7 @@
                             }
                         }
                     } catch (e) { /* abaikan ralat frame */ }
+                    finally { window.__scanBusy = false; }
                 }, 1500);
             } catch (e) {
                 if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
@@ -7134,6 +7183,7 @@
                 name: student.name,
                 dept: student.dept,
                 date: new Date().toLocaleDateString('en-CA'), // tarikh SEBENAR imbasan dilakukan (bukan tarikh program)
+                time: new Date().toLocaleTimeString('en-GB'),  // masa SEBENAR mengikut jam peranti yang mengimbas
                 programDate: program.date,                    // tarikh program (rujukan)
                 year: program.year,
                 session: program.session,
@@ -7935,7 +7985,7 @@
                     img.onerror = () => rej(new Error('Gambar tidak dapat dimuatkan (semak sambungan internet).'));
                     img.src = student.image;
                 });
-                const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+                const detection = await faceapi.detectSingleFace(img, window.__opsiPengesanDaftar())
                     .withFaceLandmarks()
                     .withFaceDescriptor();
                 if (!detection) {
@@ -8141,6 +8191,7 @@
                             'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js',
                             'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
                             'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/tiny_face_detector_model-weights_manifest.json',
+                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/ssd_mobilenetv1_model-weights_manifest.json',
                             'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/face_landmark_68_model-weights_manifest.json',
                             'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/face_recognition_model-weights_manifest.json'
                         ];
