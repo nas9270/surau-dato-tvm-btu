@@ -4948,6 +4948,7 @@
                 // Status enjin + render senarai semakan selepas view siap
                 setTimeout(async () => {
                     window.renderCfReview && window.renderCfReview();
+                    window.initManualAttSearch && window.initManualAttSearch(); // medan cari Rekod Manual
                     const el = document.getElementById('cf-engine-status');
                     if (!el) return;
                     const c = window.getCfConf();
@@ -4982,6 +4983,11 @@
                                     <h3 class="font-bold text-gray-900 text-sm"><i class="fas fa-user-pen text-primary-600 mr-1"></i> Rekod Manual (wajah gagal dikenali)</h3>
                                     <span class="text-[10px] text-gray-400 font-bold uppercase">Kaedah: manual-qr</span>
                                 </div>
+                                <!-- CARI NAMA: medan taip menapis dropdown secara langsung —
+                                     300 pelajar tidak lagi perlu ditatal satu persatu -->
+                                <input type="text" id="manual-att-cari" placeholder="🔍 Taip nama / kod pelajar (cth: Ali atau DEE1)..." autocomplete="off"
+                                       oninput="window.tapisManualStudent()"
+                                       class="w-full border rounded-xl p-2.5 text-sm mb-2 focus:ring-2 focus:ring-primary-500 outline-none">
                                 <div class="flex gap-2">
                                     <select id="manual-att-student" class="flex-grow border rounded-xl p-2.5 text-sm bg-gray-50">
                                         <option value="">-- Pilih Pelajar --</option>
@@ -4989,7 +4995,8 @@
                                     </select>
                                     <button onclick="window.markManualAttendance()" class="bg-primary-600 hover:bg-primary-700 text-white px-4 rounded-xl text-sm font-bold transition flex items-center gap-2"><i class="fas fa-check"></i> Rekod</button>
                                 </div>
-                                <p class="text-[11px] text-gray-400 mt-2"><i class="fas fa-info-circle mr-1"></i> Untuk pelajar yang wajahnya tidak dapat dikenali — rekod ditulis dengan kaedah 'manual-qr' untuk audit.</p>
+                                <p id="manual-att-hint" class="text-[11px] text-gray-400 mt-2 hidden"></p>
+                                <p class="text-[11px] text-gray-400 mt-2"><i class="fas fa-info-circle mr-1"></i> Untuk pelajar yang wajahnya tidak dapat dikenali — rekod ditulis dengan kaedah 'manual-qr' untuk audit. <span id="manual-att-count"></span></p>
                             </div>
                             <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Face recognition berfungsi sepenuhnya di browser anda. Tiada video dihantar ke server.</p>
                         </div>
@@ -7233,6 +7240,54 @@
             const sel = document.getElementById('manual-att-student');
             if (!sel || !sel.value) { showToast('Pilih pelajar dahulu.', 'error'); return; }
             window.markAttendance(sel.value, { confidence: null, method: 'manual-qr' });
+        };
+
+        // CARI NAMA dalam Rekod Manual: medan taip menapis dropdown secara langsung.
+        // Padanan: nama ATAU kod pelajar (cth "DEE1") — tak sensitif huruf besar/kecil.
+        // Bila hanya SATU padanan, auto-pilih + Enter terus rekod (300 pelajar, 3 saat selesai).
+        window.tapisManualStudent = () => {
+            const cariEl = document.getElementById('manual-att-cari');
+            const sel = document.getElementById('manual-att-student');
+            const hint = document.getElementById('manual-att-hint');
+            const countEl = document.getElementById('manual-att-count');
+            if (!sel) return;
+            const q = (cariEl ? cariEl.value : '').trim().toLowerCase();
+            if (!q) {
+                // Kosong — pulangkan semua pilihan
+                [...sel.options].forEach(o => { o.hidden = false; });
+                if (hint) hint.classList.add('hidden');
+                if (countEl) countEl.textContent = '';
+                return;
+            }
+            let kelihatan = 0, terakhir = null;
+            [...sel.options].forEach(o => {
+                if (!o.value) return; // langkau pilihan "-- Pilih Pelajar --"
+                const m = o.textContent.toLowerCase().includes(q);
+                o.hidden = !m;
+                if (m) { kelihatan++; terakhir = o; }
+            });
+            // Auto-pilih bila satu sahaja padanan — operator cuma tekan Enter
+            if (kelihatan === 1 && terakhir) {
+                sel.value = terakhir.value;
+                if (hint) { hint.textContent = `✓ ${terakhir.textContent} — tekan butang Rekod (atau Enter)`; hint.classList.remove('hidden'); }
+            } else if (hint) {
+                hint.classList.add('hidden');
+            }
+            if (countEl) countEl.textContent = kelihatan ? `(${kelihatan} sepadan)` : '';
+            if (kelihatan === 0 && hint) { hint.textContent = 'Tiada pelajar sepadan — semak ejaan atau kosongkan carian.'; hint.classList.remove('hidden'); }
+        };
+
+        // Enter dalam medan carian = terus rekod (bila pelajar sudah auto-pilih)
+        window.initManualAttSearch = () => {
+            const cariEl = document.getElementById('manual-att-cari');
+            if (!cariEl || cariEl.__init) return;
+            cariEl.__init = true;
+            cariEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    window.markManualAttendance();
+                }
+            });
         };
 
         // === PILIHAN KAMERA (depan/belakang) — smartphone ===
