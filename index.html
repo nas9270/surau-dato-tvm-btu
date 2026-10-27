@@ -7704,7 +7704,8 @@
                 // Penalaan: naikkan ke 0.40 jika terlalu banyak gagal; turunkan ke 0.36
                 // jika masih ada salah nama. 0.38 ialah titik paling ketat yang masih praktikal.
                 const MATCH_THRESHOLD = 0.38;
-                const MATCH_MARGIN = 0.07;
+                const MATCH_MARGIN = 0.07;        // bingkai pertama — ketat
+                const MATCH_MARGIN_RELAX = 0.05;  // bingkai susulan dalam tetingkap 7s selepas "hampir"
                 const MIN_BOX_PX = 110;
                 const matchFace = (desc) => {
                     let best = null, bestOther = Infinity;
@@ -7721,17 +7722,30 @@
                     }
                     if (!best) return { label: 'unknown' };
                     if (best.distance > MATCH_THRESHOLD) return { label: 'unknown' };
-                    if (bestOther - best.distance < MATCH_MARGIN) return { label: 'unknown' };
+                    // MARGIN BERGILIR: tetingkap longgar aktif selepas kegagalan "hampir"
+                    const margin = (Date.now() < (window.__marginRelaxUntil || 0)) ? MATCH_MARGIN_RELAX : MATCH_MARGIN;
+                    if (bestOther - best.distance < margin) {
+                        // jarak LULUS tapi margin gagal = "hampir" — buka tetingkap 7s
+                        // supaya bingkai seterusnya (kini ~0.7s kemudian) dicuba lebih lunak
+                        window.__marginRelaxUntil = Date.now() + 7000;
+                        return { label: 'unknown', hampir: true };
+                    }
                     return best;
                 };
 
                 // Guard in-flight: elak hantar rekod sama berkali-kali dalam frame berturut-turut
                 const inFlight = new Set();
 
-                scanInterval = setInterval(async () => {
-                    if (!scanActive) return;
-                    if (window.__scanBusy) return; // SSD lebih teliti tetapi lebih berat — elak kitaran bertindih
+                // KITARAN ADAPTIF (keputusan #2): bukan lagi setInterval tetap —
+                // wajah hadir dalam bingkai → bingkai seterusnya dalam 700ms (kerja aktif);
+                // tiada wajah → 1500ms (kamera/CPU rehat, telefon murah tidak terseksa).
+                // Gelung penjadualan-sendiri: selalu bangkit, sibuk → tunda 300ms sahaja.
+                let adaWajahBingkaiIni = false;
+                const scanTick = async () => {
+                    if (!scanActive) { scanInterval = null; return; }
+                    if (window.__scanBusy) { scanInterval = setTimeout(scanTick, 300); return; } // kitaran sibuk — cuba lagi nanti
                     window.__scanBusy = true;
+                    adaWajahBingkaiIni = false;
                     try {
                         // ---- laluan imbasan (CompreFace → face-api) ----
                         window.__scanNota = ''; // reset arahan bingkai ini
@@ -7758,14 +7772,9 @@
                                     ctx.fillText(tag, cfX(f.box.x, f.box.width), Math.max(14, f.box.y * sc - 6));
                                     if (!f.subject || f.similarity < c.reviewBand || f.liveness !== 1) continue;
                                     if (dalamJalur) { window.tandaSemakanManual(f); continue; } // jalur kelabu: operator sah yang lulus
-                                    // kekal pengesahan 2-frame (ArcFace pantas — 2 frame berturut ~0.5-1s)
-                                    const confirms = window.__scanConfirms || (window.__scanConfirms = new Map());
-                                    const cfm = confirms.get(f.subject) || { n: 0, t: 0 };
-                                    const nowCf = Date.now();
-                                    cfm.n = (nowCf - cfm.t < 7000) ? cfm.n + 1 : 1;
-                                    cfm.t = nowCf;
-                                    confirms.set(f.subject, cfm);
-                                    if (cfm.n >= 2 && !inFlight.has(f.subject)) {
+                                    // REKOD 1-BINGKAI (selari laluan face-api): padanan +
+                                    // liveness lulus pada bingkai ini = tulis terus
+                                    if (!inFlight.has(f.subject)) {
                                         // 10-PERANTI: sama — tulisan tidak menyekat gelung
                                         inFlight.add(f.subject);
                                         window.markAttendance(f.subject, { confidence: f.similarity, method: 'compreFace' }).catch(() => {});
@@ -7773,6 +7782,7 @@
                                     }
                                 }
                                 window.__cfFrameOk = Date.now(); // tanda pelayan sihat
+                                adaWajahBingkaiIni = faces.length > 0; // kitaran adaptif: wajah hadir → pantas
                                 return;
                             } catch (e) {
                                 // CompreFace tidak capai/timeout — jatuh ke laluan face-api frame ini
@@ -7783,9 +7793,10 @@
                             }
                         }
                         // ===== LALUAN 2: FACE-API.JS (fallback offline / pelayan tidak sihat) =====
-                        const detections = await faceapi.detectAllFaces(video, window.__opsiPengesanImbas())
+                        const detections = await faceapi.detectAllFaces(video, window.__opsiPengesenImbas())
                             .withFaceLandmarks()
                             .withFaceDescriptors();
+                        adaWajahBingkaiIni = detections.length > 0; // kitaran adaptif: wajah hadir → pantas
                         const resized = faceapi.resizeResults(detections, displaySize);
                         const resizedDetections = resized.detections || resized;
                         const ctx = canvas.getContext('2d');
@@ -7824,20 +7835,14 @@
                             }
                             const best = matchFace(det.descriptor);
                             const isKnown = best.label !== 'unknown';
-                            // PENGESAHAN 2-FRAME: rekod hanya ditulis bila padanan KEEKAL
-                            // 2 frame berturut-turut (dalam 7 saat) — noise satu-frame dari
-                            // wajah seakan/cahaya lembut tidak lagi menulis rekod salah.
-                            const confirms = window.__scanConfirms || (window.__scanConfirms = new Map());
-                            let lulus2Frame = false;
-                            if (isKnown) {
-                                const c = confirms.get(best.label) || { n: 0, t: 0 };
-                                const now2 = Date.now();
-                                c.n = (now2 - c.t < 7000) ? c.n + 1 : 1;
-                                c.t = now2;
-                                confirms.set(best.label, c);
-                                lulus2Frame = c.n >= 2;
-                                if (!lulus2Frame) window.__scanNota = 'Kekal menghadap — mengesahkan (' + c.n + '/2)';
-                            }
+                            // === REKOD 1-BINGKAI (keputusan pengurusan) ===
+                            // Padanan ketat (≤0.38) + margin pelajar-lain (0.07) + frontal +
+                            // kotak ≥110px pada bingkai INI = rekod terus ditulis. Pelindung
+                            // salah-nama kekal: threshold, margin, frontal, 110px, inFlight 5s,
+                            // dedup pelayan — enam lapis. Tiada menunggu bingkai kedua.
+                            // MARGIN BERGILIR: bila wajah HAMPIR lulus (jarak lulus tapi margin
+                            // gagal), tetingkap 7s dibuka dengan margin longgar 0.05 — bingkai
+                            // susulan memberi kelonggaran kedua tanpa membuka pintu 0.04 lama.
                             // LIVENESS DILONGGARKAN atas keputusan pengurusan: semua pelajar
                             // yang datang ke surau hadir secara fizikal — syarat berkedip
                             // dibuang (lulusKedip sentiasa true). Kod EAR dikekalkan sebagai
@@ -7852,8 +7857,10 @@
                             }
                             // Papar nama pelajar (bukan ID mentah) pada kotak + status proses
                             let label, warnaKotak;
-                            if (!isKnown) { label = 'Tidak dikenali'; warnaKotak = 'red'; window.__scanNota = 'Wajah tiada dalam galeri — daftar dahulu / Rekod Manual'; }
-                            else if (!lulus2Frame) { label = (nameMap[best.label] || best.label) + ' — mengesahkan...'; warnaKotak = 'orange'; }
+                            if (!isKnown) {
+                                label = 'Tidak dikenali'; warnaKotak = 'red';
+                                window.__scanNota = best.hampir ? 'Hampir! Kekal menghadap sebentar — mengesahkan lagi' : 'Wajah tiada dalam galeri — daftar dahulu / Rekod Manual';
+                            }
                             else { label = (nameMap[best.label] || best.label) + ' ✓'; warnaKotak = 'green'; }
                             new faceapi.draw.DrawBox(cerminBox(det.detection.box), { label: label, boxColor: warnaKotak }).draw(canvas);
 
@@ -7862,11 +7869,12 @@
                                 const now = Date.now();
                                 if (now - (window.__lastScanFail || 0) > 10000 && !document.getElementById('scan-result-overlay')) {
                                     window.__lastScanFail = now;
-                                    window.showScanResult(false, 'Wajah tidak dikenali. Cuba hadap kamera dengan jelas.');
+                                    window.showScanResult(false, best.hampir ? 'Hampir dikenali — kekal menghadap kamera 1-2 saat lagi.' : 'Wajah tidak dikenali. Cuba hadap kamera dengan jelas.');
                                 }
                             }
 
-                            if (isKnown && lulus2Frame && lulusKedip && !inFlight.has(best.label)) {
+                            // REKOD 1-BINGKAI: dikenali + lulus semua pagar bingkai ini = tulis sekarang
+                            if (isKnown && lulusKedip && !inFlight.has(best.label)) {
                                 // 10-PERANTI: tulisan TIDAK menunggu pelayan — gelung imbasan
                                 // terus bergerak walaupun pelayan lambat; dedup pelayan +
                                 // inFlight 5s menghalang pendua bila respons lewat
@@ -7890,8 +7898,11 @@
                         // dipaparkan setiap bingkai — operator tidak lagi menatap kosong.
                         const stEl = document.getElementById('scan-status');
                         if (stEl && scanActive && window.__scanNota) stEl.textContent = window.__scanNota;
+                        // KITARAN ADAPTIF: wajah hadir → 700ms; kosong → 1500ms
+                        if (scanActive) scanInterval = setTimeout(scanTick, adaWajahBingkaiIni ? 700 : 1500);
                     }
-                }, 1500);
+                };
+                scanInterval = setTimeout(scanTick, 700); // bingkai pertama laju — kamera sudah sedia
             } catch (e) {
                 if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
                 showToast('Ralat kamera: ' + (e.message || e), 'error');
@@ -7901,7 +7912,7 @@
 
         window.stopFaceScan = () => {
             scanActive = false;
-            if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+            if (scanInterval) { clearInterval(scanInterval); clearTimeout(scanInterval); scanInterval = null; } // kitaran adaptif guna setTimeout
             stopCamera();
             const statusEl = document.getElementById('scan-status');
             if (statusEl) statusEl.textContent = 'Imbasan dihentikan.';
