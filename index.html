@@ -4830,10 +4830,10 @@
                 const selProgram = window.resolveProgram(selProgramId);
                 const attendance = DB.attendance || [];
                 const attendedList = selProgram ? attendance.filter(a => String(a.programId) === String(selProgram.id)) : [];
-                // Kumpulan kelas: kod ringkas (cth DEE1A, SPE3) + bilangan pelajar
+                // Kumpulan imbasan: mengikut JABATAN sahaja (cth DEE, SPE) — mudah untuk kehadiran pukal
                 const sesiStudents = DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession);
                 const groupCount = {};
-                sesiStudents.forEach(s => { const k = window.studentCode(s); groupCount[k] = (groupCount[k] || 0) + 1; });
+                sesiStudents.forEach(s => { const k = String(s.dept || '').toUpperCase(); if (k) groupCount[k] = (groupCount[k] || 0) + 1; });
                 const groups = Object.keys(groupCount).sort();
 
                 return Views.AdminLayout(`
@@ -4870,10 +4870,10 @@
                             </div>
 
                             <div class="bg-white rounded-2xl border shadow-sm p-5 mb-4">
-                                <h3 class="font-bold text-gray-900 mb-1 border-b pb-2">Kelas / Kumpulan</h3>
-                                <p class="text-[11px] text-gray-400 mb-2"><i class="fas fa-bolt mr-1"></i>Imbasan lebih pantas & tepat — wajah dibandingkan dengan kumpulan ini sahaja</p>
+                                <h3 class="font-bold text-gray-900 mb-1 border-b pb-2">Jabatan</h3>
+                                <p class="text-[11px] text-gray-400 mb-2"><i class="fas fa-bolt mr-1"></i>Imbasan lebih pantas & tepat — wajah dibandingkan dengan jabatan ini sahaja</p>
                                 <select id="scan-group" onchange="window.setScanGroup(this.value)" class="w-full border rounded-xl p-3 text-sm bg-gray-50">
-                                    <option value="">Semua Pelajar (${sesiStudents.length})</option>
+                                    <option value="">Semua Jabatan (${sesiStudents.length} pelajar)</option>
                                     ${groups.map(g => `<option value="${g}" ${state.scanGroup === g ? 'selected' : ''}>${g} (${groupCount[g]} pelajar)</option>`).join('')}
                                 </select>
                                 ${state.scanGroup ? `<p class="text-xs text-primary-700 font-bold mt-2"><i class="fas fa-filter mr-1"></i>Menapis: ${state.scanGroup} sahaja</p>` : ''}
@@ -6786,7 +6786,7 @@
         const buildFaceMatcher = () => {
             const sesiSemasa = new Set((DB.students || [])
                 .filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession)
-                .filter(s => !state.scanGroup || window.studentCode(s) === state.scanGroup)
+                .filter(s => !state.scanGroup || String(s.dept || '').toUpperCase() === state.scanGroup)
                 .map(s => String(s.id)));
             const descriptors = (DB.faceDescriptors || []).filter(d => sesiSemasa.has(String(d.studentId)));
             const labeled = descriptors.map(d => {
@@ -6920,7 +6920,7 @@
             const targets = (DB.students || []).filter(s =>
                 s.image && !existing.has(String(s.id)) &&
                 String(s.year) === String(state.filterYear) && s.session === state.filterSession &&
-                (!state.scanGroup || window.studentCode(s) === state.scanGroup)
+                (!state.scanGroup || String(s.dept || '').toUpperCase() === state.scanGroup)
             );
             if (!targets.length) return { done: 0, total: 0 };
             let done = 0, failed = 0;
@@ -6967,7 +6967,7 @@
                 const perluDaftar = (DB.students || []).filter(s =>
                     s.image && !existingSet.has(String(s.id)) &&
                     String(s.year) === String(state.filterYear) && s.session === state.filterSession &&
-                    (!state.scanGroup || window.studentCode(s) === state.scanGroup)
+                    (!state.scanGroup || String(s.dept || '').toUpperCase() === state.scanGroup)
                 ).length;
                 if (perluDaftar > 0) {
                     showToast(`Menjana data wajah ${perluDaftar} pelajar di latar belakang — imbasan boleh bermula serta-merta.`, 'info');
