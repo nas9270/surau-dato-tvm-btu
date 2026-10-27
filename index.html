@@ -371,7 +371,11 @@
 
         // Sel nama boleh klik → biodata penuh; kod + telefon di bawah nama
         window.personCell = (name, opts = {}) => {
-            const st = (DB.students || []).find(x => String(x.name).trim().toLowerCase() === String(name || '').trim().toLowerCase());
+            // Padanan ID dahulu (persis), nama sebagai sandaran — nama kembar pada 300 pelajar
+            // tidak lagi mencampurkan biodata pelajar lain
+            const st = (DB.students || []).find(x => opts.id
+                ? String(x.id) === String(opts.id)
+                : String(x.name).trim().toLowerCase() === String(name || '').trim().toLowerCase());
             const kod = st ? window.studentCode(st) : '';
             const phone = st ? (st.phone || '') : '';
             const onclick = st
@@ -679,18 +683,32 @@
         // Jika dibuka di luar Apps Script (tiada google.script.run), semua panggilan
         // data diterjemahkan secara automatik kepada API JSON GAS — kamera berfungsi
         // di GitHub Pages kerana tiada iframe GAS menyekatnya.
+        // KESELAMATAN: URL exec terbuka — sesiapa baca kod boleh POST rekod palsu.
+        // Setiap panggilan ditandatangani HMAC-SHA256 (rahsia dipadankan di GAS).
+        // Aktifkan dengan menetapkan GAS_SECRET di bawah DAN verifier sama di GAS.
+        const GAS_SECRET = ''; // kosongkan = tanpa HMAC (mod sedia ada). Isi sama seperti GAS.
         const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxIuw3myLP5WzAuHz1IKe1LBJMDR6cZBLgr8ANP6HP1HWS-QMpLZBqh-CH_zrQwngLK/exec';
+        window.gasSign = async (action, argsJson) => {
+            const ts = String(Date.now());
+            const enc = (s) => new TextEncoder().encode(s);
+            const key = await crypto.subtle.importKey('raw', enc(GAS_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+            const sig = await crypto.subtle.sign('HMAC', key, enc(action + '|' + ts + '|' + argsJson));
+            return '&ts=' + ts + '&sig=' + [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+        };
         (function installGasShim() {
             if (typeof google !== 'undefined' && google.script && google.script.run) return; // di dalam GAS — guna asal
             if (!GAS_API_URL) return;
-            const callApi = (action, args, okFn, failFn) => {
+            const callApi = async (action, args, okFn, failFn) => {
                 try {
                     // Pastikan rekod objek mempunyai id (supaya id lokal == id pelayan)
                     if (args && args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]) && !args[0].id && !/^(get|verify)/.test(action) && action !== 'updateRecord' && action !== 'deleteRecord') {
                         args[0].id = action.replace(/^save|^submit|^record/, '').toLowerCase() + '_' + Date.now();
                     }
                     const argsJson = JSON.stringify(args || []);
-                    const qs = '?action=' + encodeURIComponent(action) + '&args=' + encodeURIComponent(argsJson) + '&t=' + Date.now();
+                    // Tandatangan HMAC bila rahsia ditetapkan — pelayan GAS menolak panggilan
+                    // tanpa/tertanggal (>10 minit) bila verifier aktif di sebelah GAS
+                    const sigQs = GAS_SECRET ? await window.gasSign(action, argsJson) : '';
+                    const qs = '?action=' + encodeURIComponent(action) + '&args=' + encodeURIComponent(argsJson) + '&t=' + Date.now() + sigQs;
                     if (qs.length < 5500) {
                         fetch(GAS_API_URL + qs)
                             .then(r => r.json())
@@ -701,7 +719,16 @@
                             .catch(e => { if (failFn) failFn(e); else if (okFn) okFn(null); });
                     } else {
                         // Payload besar (gambar base64): POST no-cors — respons legap tetapi tulisan diproses pelayan
-                        fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: action, args: args }) })
+                        // HMAC dihantar dalam badan (no-cors tidak benarkan header tersuai)
+                        let sigHex = '', tsStr = '';
+                        if (GAS_SECRET) {
+                            tsStr = String(Date.now());
+                            const enc2 = (s) => new TextEncoder().encode(s);
+                            const key2 = await crypto.subtle.importKey('raw', enc2(GAS_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+                            const sig2 = await crypto.subtle.sign('HMAC', key2, enc2(action + '|' + tsStr + '|' + argsJson));
+                            sigHex = [...new Uint8Array(sig2)].map(b => b.toString(16).padStart(2, '0')).join('');
+                        }
+                        fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: action, args: args, ts: tsStr, sig: sigHex }) })
                             .then(() => setTimeout(() => {
                                 if (okFn) okFn({ success: true, id: (args[0] && args[0].id) || undefined, image: (args[0] && args[0].image) || undefined });
                             }, 1500))
@@ -727,6 +754,79 @@
         })();
 
         window.initApp();
+
+        // === GILIR KEHADIRAN OFFLINE (IndexedDB) ===
+        // localStorage terhad 5MB dan gilir terkatung selepas reload (tiada 'online' event
+        // bila talian tidak pernah putus). IndexedDB + canai semula semasa load memastikan
+        // rekod offline TIDAK hilang walaupun browser ditutup dan dibuka semula.
+        const attDB = () => new Promise((res, rej) => {
+            const r = indexedDB.open('surau-att', 1);
+            r.onupgradeneeded = (e) => { e.target.result.createObjectStore('queue', { keyPath: 'qid' }); };
+            r.onsuccess = (e) => res(e.target.result);
+            r.onerror = () => rej(r.error);
+        });
+        window.qPut = async (rec) => {
+            const db = await attDB();
+            rec.qid = rec.qid || ('q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+            return new Promise((res, rej) => {
+                const t = db.transaction('queue', 'readwrite').objectStore('queue').put(rec);
+                t.onsuccess = res; t.onerror = () => rej(t.error);
+            });
+        };
+        window.qAll = async () => {
+            const db = await attDB();
+            return new Promise((res, rej) => {
+                const t = db.transaction('queue').objectStore('queue').getAll();
+                t.onsuccess = () => res(t.result || []); t.onerror = () => rej(t.error);
+            });
+        };
+        window.qDel = async (qid) => {
+            const db = await attDB();
+            return new Promise((res, rej) => {
+                const t = db.transaction('queue', 'readwrite').objectStore('queue').delete(qid);
+                t.onsuccess = res; t.onerror = () => rej(t.error);
+            });
+        };
+        // Hantar semua gilir offline ke pelayan (jika ada) — panggil semasa load & bila talian kembali
+        window.flushAttQueue = async () => {
+            try {
+                if (typeof google === 'undefined' || !google.script || !google.script.run) return 0;
+                if (!navigator.onLine) return 0;
+                const queue = await window.qAll();
+                if (!queue.length) return 0;
+                let sent = 0;
+                for (const rec of queue) {
+                    await new Promise((resolve) => {
+                        let selesai = false;
+                        const tamat = setTimeout(() => { if (!selesai) { selesai = true; resolve(); } }, 8000);
+                        google.script.run
+                            .withSuccessHandler(function() {
+                                if (selesai) return; selesai = true; clearTimeout(tamat);
+                                window.qDel(rec.qid); sent++; resolve();
+                            })
+                            .withFailureHandler(function() {
+                                if (selesai) return; selesai = true; clearTimeout(tamat);
+                                resolve(); // kekal dalam gilir
+                            })
+                            .recordAttendance(rec);
+                    });
+                }
+                if (sent > 0) showToast(sent + ' rekod kehadiran offline diselaraskan ke pelayan.', 'info');
+                return sent;
+            } catch (e) { return 0; }
+        };
+        // Pindahkan gilir lama (localStorage) ke IndexedDB sekali sahaja
+        (async () => {
+            try {
+                const lama = JSON.parse(localStorage.getItem('surau_att_queue') || '[]');
+                if (Array.isArray(lama) && lama.length) {
+                    for (const rec of lama) await window.qPut(rec);
+                    localStorage.setItem('surau_att_queue', '[]');
+                }
+            } catch (e) {}
+            // Canai semula selepas getInitialData selesai (dedup pelayan berfungsi)
+            setTimeout(() => window.flushAttQueue(), 5000);
+        })();
 
         // === PIL SOLAT SETERUSNYA (kekal di semua halaman — teks pasif, terus boleh dibaca) ===
         (function initPrayerPill() {
@@ -918,6 +1018,12 @@
                     DB[collection] = DB[collection].filter(item => item.id !== id);
                     // Selaras storan tempatan untuk koleksi yang persist
                     if (collection === 'feedback') { try { localStorage.setItem('surau_feedback', JSON.stringify(DB.feedback)); } catch (e) { /* abaikan */ } }
+                    // Padam wajah pelajar daripada CompreFace & descriptor tempatan supaya
+                    // ID pelajar tidak berfungsi lagi selepas rekod dipadam
+                    if (collection === 'students') {
+                        window.cfDeleteSubject && window.cfDeleteSubject(id);
+                        DB.faceDescriptors = (DB.faceDescriptors || []).filter(d => String(d.studentId) !== String(id));
+                    }
                     showToast('Rekod berjaya dipadam!', 'success');
                     modal.remove();
                     router();
@@ -2122,8 +2228,8 @@
                                     <tbody class="divide-y divide-gray-200 bg-white">
                                         ${progressList.map(p => `
                                             <tr class="hover:bg-gray-50 transition">
-                                                <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
+                                                <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true, id: p.menteeId })}</td>
+                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor, { avatar: true, id: p.mentorId })}</td>
                                                 <td class="px-6 py-4 text-gray-600"><i class="fas fa-chalkboard-teacher text-gray-400 mr-1.5"></i>${p.fasi || '-'}</td>
                                                 ${state.currentUser ? `
                                                 <td class="px-6 py-4">
@@ -2294,8 +2400,8 @@
                                     <tbody class="divide-y divide-gray-200 bg-white">
                                         ${progressList.map(p => `
                                             <tr class="hover:bg-gray-50 transition">
-                                                <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
+                                                <td class="px-6 py-4 font-bold text-gray-900">${window.personCell(p.mentee, { avatar: true, id: p.menteeId })}</td>
+                                                <td class="px-6 py-4 text-gray-600">${window.personCell(p.mentor, { avatar: true, id: p.mentorId })}</td>
                                                 <td class="px-6 py-4 text-gray-600"><i class="fas fa-chalkboard-teacher text-gray-400 mr-1.5"></i>${p.fasi || '-'}</td>
                                                 ${state.currentUser ? `
                                                 <td class="px-6 py-4">
@@ -3486,11 +3592,11 @@
                                 </tr></thead>
                                 <tbody class="divide-y divide-gray-100">
                                     ${depts.flatMap(d => Object.values(byDept[d].terkini)).sort((a, b) => String(a.mentee).localeCompare(String(b.mentee))).map(p => `<tr class="hover:bg-gray-50">
-                                        <td class="px-5 py-3">${window.personCell(p.mentee, { avatar: true })}</td>
+                                        <td class="px-5 py-3">${window.personCell(p.mentee, { avatar: true, id: p.menteeId })}</td>
                                         <td class="px-5 py-3 text-gray-600">${deptOf(p.mentee)}</td>
                                         <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-bold ${p.level === 'Al-Quran' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${p.level || '-'}</span></td>
                                         <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
-                                        <td class="px-5 py-3">${p.mentor ? window.personCell(p.mentor, { avatar: true }) : '-'}</td>
+                                        <td class="px-5 py-3">${p.mentor ? window.personCell(p.mentor, { avatar: true, id: p.mentorId }) : '-'}</td>
                                         <td class="px-5 py-3 text-right text-xs text-gray-500">${formatDate(p.lastUpdate)}${p.time ? ' · ' + p.time : ''}</td>
                                     </tr>`).join('')}
                                 </tbody>
@@ -3553,7 +3659,7 @@
                                         <td class="px-5 py-3 text-gray-600">${p.time || '-'}</td>
                                         <td class="px-5 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-bold ${p.level === 'Al-Quran' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${p.level || '-'}</span></td>
                                         <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
-                                        <td class="px-5 py-3">${p.mentor ? window.personCell(p.mentor, { avatar: true }) : '-'}</td>
+                                        <td class="px-5 py-3">${p.mentor ? window.personCell(p.mentor, { avatar: true, id: p.mentorId }) : '-'}</td>
                                         <td class="px-5 py-3 text-center">${p.image ? `<img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-8 h-8 rounded-lg object-cover border cursor-zoom-in" loading="lazy">` : '-'}</td>
                                     </tr>`).join('')}
                                 </tbody>
@@ -3604,7 +3710,7 @@
                                 </tr></thead>
                                 <tbody class="divide-y divide-gray-100">
                                     ${menteeList.map(p => `<tr class="hover:bg-gray-50">
-                                        <td class="px-5 py-3">${window.personCell(p.mentee, { avatar: true })}</td>
+                                        <td class="px-5 py-3">${window.personCell(p.mentee, { avatar: true, id: p.menteeId })}</td>
                                         <td class="px-5 py-3 text-gray-600">${deptOf(p.mentee)}</td>
                                         <td class="px-5 py-3 text-center font-bold text-amber-700">${rekodM.filter(x => x.mentee === p.mentee).length}</td>
                                         <td class="px-5 py-3 font-black text-primary-700">${p.progress || '-'}</td>
@@ -3764,8 +3870,8 @@
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     ${progress.map(p => `
                                         <tr class="hover:bg-gray-50 transition">
-                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
+                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true, id: p.menteeId })}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor, { avatar: true, id: p.mentorId })}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
                                             <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}</span>${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
@@ -3903,8 +4009,8 @@
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     ${progress.map(p => `
                                         <tr class="hover:bg-gray-50 transition">
-                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true })}</td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor, { avatar: true })}</td>
+                                            <td class="px-6 py-4 font-bold text-sm text-gray-900">${window.personCell(p.mentee, { avatar: true, id: p.menteeId })}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">${window.personCell(p.mentor, { avatar: true, id: p.mentorId })}</td>
                                             <td class="px-6 py-4 text-sm text-gray-600">${p.fasi || '-'}</td>
                                             <td class="px-6 py-4"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${p.level==='Al-Quran'?'bg-emerald-100 text-emerald-800':'bg-blue-100 text-blue-800'}">${p.level||'Al-Quran'}</span></td>
                                             <td class="px-6 py-4"><span class="text-sm font-black text-primary-700">${p.progress}</span> <span class="text-xs text-gray-400 font-medium ml-2 border-l pl-2">${formatDate(p.lastUpdate)}${p.time ? " · " + p.time : ""}</span>${p.image ? ` <img src="${p.image}" onclick="window.viewImage('${p.image}', 'Gambar Kelas')" class="inline-block w-7 h-7 rounded-lg object-cover border cursor-zoom-in align-middle ml-1" title="Gambar kelas" loading="lazy">` : ""}</td>
@@ -4836,6 +4942,21 @@
                 sesiStudents.forEach(s => { const k = String(s.dept || '').toUpperCase(); if (k) groupCount[k] = (groupCount[k] || 0) + 1; });
                 const groups = Object.keys(groupCount).sort();
 
+                // Status enjin + render senarai semakan selepas view siap
+                setTimeout(async () => {
+                    window.renderCfReview && window.renderCfReview();
+                    const el = document.getElementById('cf-engine-status');
+                    if (!el) return;
+                    const c = window.getCfConf();
+                    if (!c.enabled || !c.url || !c.key) {
+                        el.innerHTML = '<span class="text-gray-500"><i class="fas fa-microchip mr-1"></i>Enjin tempatan (face-api.js) — <a href="#admin-settings" class="text-primary-700 font-bold hover:underline">aktifkan CompreFace di Tetapan</a></span>';
+                    } else if (await window.cfPing()) {
+                        el.innerHTML = '<span class="text-green-700"><i class="fas fa-check-circle mr-1"></i>CompreFace (ArcFace) SIHAT — enjin utama aktif · liveness ON</span>';
+                    } else {
+                        el.innerHTML = '<span class="text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>CompreFace TIDAK CAPAI — fallback enjin tempatan</span>';
+                    }
+                }, 300);
+
                 return Views.AdminLayout(`
                     <h1 class="text-2xl font-black text-gray-900 mb-2">Imbasan Kehadiran (Pengecaman Wajah)</h1>
                     <p class="text-sm text-gray-500 mb-6">Kamera akan mengesan dan mengenal pasti pelajar secara automatik. Pastikan kamera diaktifkan.</p>
@@ -4851,10 +4972,30 @@
                                 <button id="btn-start-scan" onclick="window.startFaceScan()" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-play"></i> Mula Imbasan</button>
                                 <button id="btn-stop-scan" onclick="window.stopFaceScan()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-stop"></i> Henti</button>
                             </div>
+                            <!-- Butang Rekod Manual: wajah gagal dikenali (cahaya/kembar/cermin) tidak memadam kehadiran sesiapa -->
+                            <div class="bg-white rounded-2xl border shadow-sm p-4 mt-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="font-bold text-gray-900 text-sm"><i class="fas fa-user-pen text-primary-600 mr-1"></i> Rekod Manual (wajah gagal dikenali)</h3>
+                                    <span class="text-[10px] text-gray-400 font-bold uppercase">Kaedah: manual-qr</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <select id="manual-att-student" class="flex-grow border rounded-xl p-2.5 text-sm bg-gray-50">
+                                        <option value="">-- Pilih Pelajar --</option>
+                                        ${window.sortStudentsByDept(sesiStudents).map(s => `<option value="${s.id}">${window.studentCode(s)} — ${s.name}</option>`).join('')}
+                                    </select>
+                                    <button onclick="window.markManualAttendance()" class="bg-primary-600 hover:bg-primary-700 text-white px-4 rounded-xl text-sm font-bold transition flex items-center gap-2"><i class="fas fa-check"></i> Rekod</button>
+                                </div>
+                                <p class="text-[11px] text-gray-400 mt-2"><i class="fas fa-info-circle mr-1"></i> Untuk pelajar yang wajahnya tidak dapat dikenali — rekod ditulis dengan kaedah 'manual-qr' untuk audit.</p>
+                            </div>
                             <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Face recognition berfungsi sepenuhnya di browser anda. Tiada video dihantar ke server.</p>
                         </div>
 
                         <div>
+                            <!-- Status enjin + baris Semakan Manual (jalur kelabu CompreFace 68-80%) -->
+                            <div class="bg-white rounded-2xl border shadow-sm p-5 mb-4">
+                                <h3 class="font-bold text-gray-900 mb-3 border-b pb-2 flex items-center gap-2"><i class="fas fa-microchip text-primary-600"></i> Enjin Pengecaman</h3>
+                                <div id="cf-engine-status" class="text-xs font-bold text-gray-500">Memeriksa...</div>
+                            </div>
                             <div class="bg-white rounded-2xl border shadow-sm p-5 mb-4">
                                 <h3 class="font-bold text-gray-900 mb-3 border-b pb-2">Program Dipilih</h3>
                                 <select id="scan-program" onchange="window.setScanProgram(this.value)" class="w-full border rounded-xl p-3 text-sm bg-gray-50">
@@ -4877,6 +5018,12 @@
                                     ${groups.map(g => `<option value="${g}" ${state.scanGroup === g ? 'selected' : ''}>${g} (${groupCount[g]} pelajar)</option>`).join('')}
                                 </select>
                                 ${state.scanGroup ? `<p class="text-xs text-primary-700 font-bold mt-2"><i class="fas fa-filter mr-1"></i>Menapis: ${state.scanGroup} sahaja</p>` : ''}
+                            </div>
+
+                            <!-- Baris jalur kelabu CompreFace: keyakinan 68-80% menunggu kelulusan operator -->
+                            <div class="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 mb-4">
+                                <h3 class="font-bold text-gray-900 mb-2 border-b pb-2 flex items-center gap-2 text-sm"><i class="fas fa-user-clock text-amber-500"></i> Semakan Manual <span id="cf-review-count" class="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">0</span></h3>
+                                <div id="cf-review-list"><p class="text-xs text-gray-400 italic py-2">Tiada rekod menunggu semakan.</p></div>
                             </div>
 
                             <div class="bg-white rounded-2xl border shadow-sm p-5">
@@ -5045,6 +5192,55 @@
                                 <i class="fas fa-sitemap text-amber-500 text-lg"></i>
                                 <p class="text-xs text-amber-900 font-semibold flex-grow">Untuk kemas kini <b>Carta Organisasi</b> (nama, gambar & pembantu pelajar setiap jawatan), buka halaman Info Surau — butang ✎ akan muncul pada setiap kotak jawatan.</p>
                                 <a href="#info" class="flex-shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-lg transition"><i class="fas fa-edit mr-1"></i> Edit Carta Organisasi</a>
+                            </div>
+                        </div>
+
+                        <!-- Enjin Pengecaman CompreFace (ArcFace / InsightFace) -->
+                        <div class="mt-6 pt-5 border-t">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fas fa-microchip text-primary-600"></i>
+                                <h3 class="font-bold text-gray-900 text-sm">Enjin Pengecaman Wajah — CompreFace (ArcFace)</h3>
+                            </div>
+                            <p class="text-[11px] text-gray-500 leading-relaxed mb-4">Pelayan CompreFace di mini-PC surau meningkatkan ketepatan (ArcFace 512-D) dan menolak foto skrin (liveness). Bila pelayan tidak dapat dicapai / offline, sistem jatuh balik ke enjin tempatan (face-api.js) secara automatik. Medan kosong = enjin tempatan sahaja.</p>
+                            <form onsubmit="window.saveCfSettings(event)" class="space-y-4">
+                                <label class="flex items-center gap-2.5 border rounded-xl p-3 bg-blue-50/60 border-blue-200 cursor-pointer">
+                                    <input type="checkbox" id="cf-enabled" class="w-4 h-4 accent-blue-700">
+                                    <span class="text-xs font-bold text-blue-900">Aktifkan CompreFace sebagai enjin utama</span>
+                                </label>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">URL Pelayan (cth: https://compreface.surau.example)</label>
+                                    <input type="url" id="cf-url" placeholder="http://192.168.1.50:8000" class="w-full border rounded-xl p-3 text-sm font-mono bg-gray-50">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Recognition API Key</label>
+                                    <input type="text" id="cf-key" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" class="w-full border rounded-xl p-3 text-sm font-mono bg-gray-50">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Auto-rekod ≥ (%)</label>
+                                        <input type="number" id="cf-min" min="50" max="100" step="1" class="w-full border rounded-xl p-3 text-sm bg-gray-50">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Jalur Semakan ≥ (%)</label>
+                                        <input type="number" id="cf-band" min="40" max="99" step="1" class="w-full border rounded-xl p-3 text-sm bg-gray-50">
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="button" onclick="window.testCfConn()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition flex items-center justify-center gap-2"><i class="fas fa-plug"></i> Uji Sambungan</button>
+                                    <button type="submit" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 rounded-xl text-sm transition flex items-center justify-center gap-2"><i class="fas fa-save"></i> Simpan</button>
+                                </div>
+                                <div id="cf-test-result" class="text-xs font-bold"></div>
+                            </form>
+                            <div class="mt-3 bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-[11px] text-indigo-900 leading-relaxed">
+                                <p class="font-bold mb-1"><i class="fas fa-server mr-1"></i>Pasang CompreFace (sekali sahaja, di mini-PC surau):</p>
+                                <ol class="list-decimal list-inside space-y-0.5 text-indigo-800">
+                                    <li>Install Docker + docker-compose di mini-PC (8GB RAM)</li>
+                                    <li><code class="bg-white px-1 rounded">git clone https://github.com/exadel-inc/CompreFace</code></li>
+                                    <li><code class="bg-white px-1 rounded">cd CompreFace && docker-compose up -d</code></li>
+                                    <li>Buka <code class="bg-white px-1 rounded">http://ip-mini-pc:8000</code> → cipta Application → salin Recognition API key</li>
+                                    <li>Isi URL + key di sini → Uji Sambungan → Simpan</li>
+                                </ol>
+                                <p class="mt-1.5">Nota: imbasan wajah juga berfungsi tanpa CompreFace (enjin tempatan). Pelajar perlu daftar wajah semula melalui kamera selepas CompreFace aktif.</p>
                             </div>
                         </div>
                     </div>
@@ -5700,25 +5896,33 @@
         };
 
         window.saveProgressForm = (e) => {
-            e.preventDefault();
-            if (!state.currentUser) { showToast('Hanya guru/mentor yang log masuk boleh merekodkan progres.', 'error'); window.location.hash = 'login'; return; } 
-            const form = e.target;
-            const btn = form.querySelector('button[type="submit"]');
-            if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...'; }
+        e.preventDefault();
+        if (!state.currentUser) { showToast('Hanya guru/mentor yang log masuk boleh merekodkan progres.', 'error'); window.location.hash = 'login'; return; } 
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...'; }
 
-            const mentee = form.elements['mentee'].value;
-            const mentor = form.elements['mentor'].value;
-            const fasi = form.elements['fasi'] ? form.elements['fasi'].value : '';
-            const level = form.elements['level'] ? form.elements['level'].value : 'Al-Quran';
-            const progress = form.elements['progress'].value;
-            const date = form.elements['date'] ? form.elements['date'].value : new Date().toISOString().split('T')[0];
-            const time = form.elements['time'] ? form.elements['time'].value : '';
-            const fileImg = form.elements['progImage'] && form.elements['progImage'].files ? form.elements['progImage'].files[0] : null;
+        const mentee = form.elements['mentee'].value;
+        const mentor = form.elements['mentor'].value;
+        const fasi = form.elements['fasi'] ? form.elements['fasi'].value : '';
+        const level = form.elements['level'] ? form.elements['level'].value : 'Al-Quran';
+        const progress = form.elements['progress'].value;
+        const date = form.elements['date'] ? form.elements['date'].value : new Date().toISOString().split('T')[0];
+        const time = form.elements['time'] ? form.elements['time'].value : '';
+        const fileImg = form.elements['progImage'] && form.elements['progImage'].files ? form.elements['progImage'].files[0] : null;
+        // Tangkap ID pelajar (mentee & mentor) bersama nama — padanan ID mengatasi nama kembar sebab
+        // nama sama pada 300 pelajar pasti wujud; rekod lama tanpa ID kekal serasi (fallback nama)
+        const menteeSt = (DB.students || []).find(s => String(s.name) === String(mentee));
+        const mentorSt = (DB.students || []).find(s => String(s.name) === String(mentor));
+        const menteeId = menteeSt ? menteeSt.id : '';
+        const mentorId = mentorSt ? mentorSt.id : '';
 
             const hantar = (imgData) => {
             const formData = { 
                 mentee, 
+                menteeId,
                 mentor, 
+                mentorId,
                 fasi, 
                 level, 
                 progress, 
@@ -5735,7 +5939,9 @@
                 DB.studentProgress.unshift({ 
                     id: 'sp_' + Date.now(), 
                     mentee, 
+                    menteeId,
                     mentor, 
+                    mentorId,
                     fasi, 
                     level, 
                     progress, 
@@ -5757,7 +5963,9 @@
                         DB.studentProgress.unshift({ 
                             id: result.id, 
                             mentee, 
+                            menteeId,
                             mentor, 
+                            mentorId,
                             fasi, 
                             level, 
                             progress, 
@@ -5771,7 +5979,9 @@
                         DB.studentProgress.unshift({ 
                             id: 'sp_' + Date.now(), 
                             mentee, 
+                            menteeId,
                             mentor, 
+                            mentorId,
                             fasi, 
                             level, 
                             progress, 
@@ -6254,6 +6464,50 @@
             }
         };
 
+        // === KONFIGURASI COMPREFACE (ArcFace) — simpan & uji ===
+        window.saveCfSettings = (e) => {
+            e.preventDefault();
+            const url = (document.getElementById('cf-url').value || '').trim().replace(/\/+$/, '');
+            const key = (document.getElementById('cf-key').value || '').trim();
+            const minSim = Math.min(1, Math.max(0.5, parseFloat(document.getElementById('cf-min').value) / 100)) || 0.80;
+            const band = Math.min(minSim - 0.01, Math.max(0.4, parseFloat(document.getElementById('cf-band').value) / 100)) || 0.68;
+            const enabled = !!(document.getElementById('cf-enabled').checked && url && key);
+            window.setCfConf({ url, key, minSimilarity: minSim, reviewBand: band, enabled });
+            showToast(enabled
+                ? 'CompreFace aktif sebagai enjin utama. Daftar wajah pelajar semula melalui kamera (migrasi ArcFace).'
+                : 'Tetapan CompreFace disimpan — enjin tempatan digunakan.', 'success');
+        };
+
+        window.testCfConn = async () => {
+            const el = document.getElementById('cf-test-result');
+            if (!el) return;
+            // Uji dengan nilai dalam borang (belum simpan pun boleh)
+            const url = (document.getElementById('cf-url').value || '').trim().replace(/\/+$/, '');
+            const key = (document.getElementById('cf-key').value || '').trim();
+            if (!url || !key) { el.innerHTML = '<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>Isi URL dan API key dahulu.</span>'; return; }
+            el.innerHTML = '<span class="text-gray-500"><i class="fas fa-spinner fa-spin mr-1"></i>Menguji sambungan...</span>';
+            try {
+                const res = await fetch(url + '/api/v1/recognition/list', { method: 'GET', headers: { 'x-api-key': key } });
+                if (res.ok) el.innerHTML = '<span class="text-green-700"><i class="fas fa-check-circle mr-1"></i>CompreFace SIHAT — sambungan & key sah.</span>';
+                else if (res.status === 401 || res.status === 403) el.innerHTML = '<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>Key tidak sah (401/403) — semak Recognition API key di konsol CompreFace.</span>';
+                else el.innerHTML = `<span class="text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>Pelayan berjalan tetapi balasan ${res.status} — semak Application.</span>`;
+            } catch (e) {
+                el.innerHTML = '<span class="text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>Tidak dapat dicapai — semak URL, mini-PC hidup, dan (bila HTTPS) tunnel.</span>';
+            }
+        };
+
+        // Pra-isi borang CompreFace setiap kali halaman Tetapan dirender
+        setTimeout(() => {
+            try {
+                const c = window.getCfConf();
+                const u = document.getElementById('cf-url'); if (u) u.value = c.url || '';
+                const k = document.getElementById('cf-key'); if (k) k.value = c.key || '';
+                const m = document.getElementById('cf-min'); if (m) m.value = Math.round((c.minSimilarity || 0.80) * 100);
+                const b = document.getElementById('cf-band'); if (b) b.value = Math.round((c.reviewBand || 0.68) * 100);
+                const en = document.getElementById('cf-enabled'); if (en) en.checked = !!c.enabled;
+            } catch (e) {}
+        }, 100);
+
         // === HUBUNGI KAMI ===
         window.submitFeedbackForm = (e) => {
             e.preventDefault();
@@ -6425,11 +6679,13 @@
             const setStat = (t) => { if (statusEl) statusEl.textContent = t; };
             if (badge) badge.classList.add('hidden');
             window.__memberScanBusy = true;
+            // 6 sampel (2/2/1/1) — multi-sudut dikekalkan pada separuh saiz storan;
+            // 12 sampel x 300 pelajar melimpahkan kuota localStorage 5MB
             const POSES = [
-                { label: 'Hadap kamera terus (depan)', frames: 4 },
-                { label: 'Pusing kepala sedikit ke KIRI', frames: 3 },
-                { label: 'Pusing kepala sedikit ke KANAN', frames: 3 },
-                { label: 'Angkat dagu sedikit ke atas', frames: 2 }
+                { label: 'Hadap kamera terus (depan)', frames: 2 },
+                { label: 'Pusing kepala sedikit ke KIRI', frames: 2 },
+                { label: 'Pusing kepala sedikit ke KANAN', frames: 1 },
+                { label: 'Angkat dagu sedikit ke atas', frames: 1 }
             ];
             const detect = (v) => faceapi.detectSingleFace(v, window.__opsiPengesanDaftar())
                 .withFaceLandmarks().withFaceDescriptor();
@@ -6502,6 +6758,7 @@
                         setStat('Pendaftaran dibatalkan — tekan butang semula untuk cuba lagi.');
                         window.__setCipPose('member', p, 'kosong');
                         window.__lukisOvalMuka('member-face-guide', '#ef4444', 'Dibatalkan — cuba semula');
+                        stopCamera(); // jangan biarkan kamera menyala selepas gagal
                         return;
                     }
                     window.__setCipPose('member', p, 'siap');
@@ -6515,6 +6772,7 @@
             } catch (e) {
                 setStat('Ralat: ' + (e.message || e));
                 showToast('Ralat kamera: ' + (e.message || e), 'error');
+                stopCamera(); // ralat kamera/timeout — pastikan lampu kamera padam
             } finally {
                 window.__memberScanBusy = false;
             }
@@ -6590,7 +6848,10 @@
             const pm = (DB.pendingMembers || []).find(x => x.id === id);
             if (!pm) return;
             const newStudent = {
-                id: 's_' + Date.now(), name: pm.name, ic: pm.ic || '', phone: pm.phone, dept: pm.dept,
+                // ID unik walaupun lulus 2 permohonan dalam milisaat sama (klik pantas) —
+                // ID bentrok = descriptor wajah bertindih = salah kenal kekal
+                id: 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                name: pm.name, ic: pm.ic || '', phone: pm.phone, dept: pm.dept,
                 semester: pm.semester || 'Sem 1', kelas: pm.kelas || '', level: pm.level || 'Al-Quran',
                 year: state.filterYear, session: state.filterSession,
                 image: pm.image || 'https://placehold.co/300x300/059669/ffffff?text=' + encodeURIComponent(pm.name.slice(0, 2))
@@ -6744,6 +7005,24 @@
         // ================= FACE RECOGNITION (KEHAADIRAN) =================
         const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model';
 
+        // BUNGKUS/NYAHBUNGKUS DESCRIPTOR — base64 Float32 (5x lebih kecil dari JSON nombor).
+        // 6 sampel terbungkus ~4.1KB -> muat laluan GET shim GAS (<5500 aksara) yang pulangkan
+        // respons SEBENAR, bukan POST no-cors legak; rekod lama format JSON kekal serasi.
+        const packDesc = (arr) => btoa(String.fromCharCode(...new Uint8Array(new Float32Array(arr).buffer)));
+        const unpackDesc = (b64) => {
+            const bin = atob(b64);
+            const u = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+            return Array.from(new Float32Array(u.buffer));
+        };
+        // Normalisasi apa-apa bentuk descriptor tersimpan -> senarai sampel (senarai 128-nombor)
+        const normDesc = (raw) => {
+            const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (Array.isArray(arr) && arr.length && typeof arr[0] === 'string') return arr.map(unpackDesc);      // format baharu (base64)
+            if (Array.isArray(arr) && Array.isArray(arr[0])) return arr;                                          // format lama (JSON berbilang sampel)
+            return [arr];                                                                                         // format lama (JSON satu sampel)
+        };
+
         let faceModelsLoaded = false;
         let ssdModelSedia = false; // pengesan lebih tepat untuk PENDAFTARAN wajah
         let faceStream = null;
@@ -6791,10 +7070,9 @@
             const descriptors = (DB.faceDescriptors || []).filter(d => sesiSemasa.has(String(d.studentId)));
             const labeled = descriptors.map(d => {
                 try {
-                    const arr = typeof d.descriptor === 'string' ? JSON.parse(d.descriptor) : d.descriptor;
-                    // Sokong pelbagai sampel: descriptor boleh jadi senarai 128 nombor (lama)
-                    // atau senarai berisi beberapa sampel (pendaftaran pelbagai sudut).
-                    const list = Array.isArray(arr) && Array.isArray(arr[0]) ? arr : [arr];
+                    // normDesc menyokong: base64 (baharu, 5x kecil) / JSON berbilang sampel (lama)
+                    // / JSON satu sampel (lama) — migrasi tanpa pecah rekod sedia ada
+                    const list = normDesc(d.descriptor);
                     return new faceapi.LabeledFaceDescriptors(String(d.studentId), list.map(a => new Float32Array(a)));
                 } catch (e) { return null; }
             }).filter(Boolean);
@@ -6823,9 +7101,127 @@
             if (scanActive) showToast(g ? `Menapis imbasan kepada ${g} sahaja.` : 'Menapis semua pelajar.', 'info');
         };
 
+        // ================= COMPREFACE (ArcFace / InsightFace) — ENJIN UTAMA =================
+        // Enjin dalam browser (face-api.js) ialah embedding 128-D era-2017; ArcFace satu generasi
+        // lebih tepat pada kohort besar (300 remaja seragam) + liveness terbina dalam.
+        // Seni bina hibrid: CompreFace bila talian ada, face-api.js sebagai fallback offline.
+        // Konfigurasi diisi dalam Tetapan Admin (disimpan localStorage) — tiada hardcode rahsia.
+        const CF_DEFAULT = { url: '', key: '', minSimilarity: 0.80, reviewBand: 0.68, enabled: false };
+        window.getCfConf = () => {
+            try { return Object.assign({}, CF_DEFAULT, JSON.parse(localStorage.getItem('surau_compreface') || '{}')); }
+            catch (e) { return { ...CF_DEFAULT }; }
+        };
+        window.setCfConf = (c) => {
+            try { localStorage.setItem('surau_compreface', JSON.stringify(c)); } catch (e) {}
+        };
+        window.cfReady = async () => {
+            const c = window.getCfConf();
+            return !!(c.enabled && c.url && c.key && navigator.onLine);
+        };
+        // Sihatkah pelayan CompreFace? (ping ringan — digunakan sebelum imbasan bermula)
+        window.cfPing = async () => {
+            const c = window.getCfConf();
+            if (!c.url) return false;
+            try {
+                const res = await fetch(c.url + '/api/v1/recognition/list', { method: 'GET', headers: { 'x-api-key': c.key } });
+                return res.ok;
+            } catch (e) { return false; }
+        };
+        // Kenal pasti semua wajah dalam satu frame — pulang subject/similarity/liveness/box
+        window.cfRecognize = async (video) => {
+            const c = window.getCfConf();
+            const cv = document.createElement('canvas');
+            cv.width = 640; cv.height = Math.round(640 * video.videoHeight / video.videoWidth);
+            cv.getContext('2d').drawImage(video, 0, 0, cv.width, cv.height);
+            const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.85));
+            const fd = new FormData(); fd.append('file', blob, 'frame.jpg');
+            const res = await fetch(c.url + '/api/v1/recognition/recognize?face_plugins=liveness,quality&det_prob_threshold=0.8',
+                { method: 'POST', headers: { 'x-api-key': c.key }, body: fd });
+            if (!res.ok) throw new Error('CompreFace ' + res.status);
+            const data = await res.json();
+            return (data.result || []).map(f => {
+                const s = f.subjects && f.subjects[0];
+                return {
+                    subject: s ? s.subject : null,
+                    similarity: s ? (s.similarity <= 1 ? s.similarity : s.similarity / 100) : 0,
+                    liveness: (f.liveness === undefined || f.liveness === null) ? 1 : f.liveness,
+                    box: f.box
+                };
+            });
+        };
+        // PENDAFTARAN: muat naik satu pose sebagai face milik subject = ID pelajar.
+        // UI 4-sudut sedia ada dikekalkan — hanya destinasi sampel berubah.
+        window.cfEnrollPose = async (student, video) => {
+            const c = window.getCfConf();
+            const cv = document.createElement('canvas');
+            cv.width = 480; cv.height = Math.round(480 * video.videoHeight / video.videoWidth);
+            cv.getContext('2d').drawImage(video, 0, 0, cv.width, cv.height);
+            const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9));
+            const fd = new FormData(); fd.append('file', blob, 'pose.jpg');
+            const res = await fetch(c.url + '/api/v1/faces/' + encodeURIComponent(student.id) + '?det_prob_threshold=0.9',
+                { method: 'POST', headers: { 'x-api-key': c.key }, body: fd });
+            if (!res.ok) throw new Error('Daftar pose gagal: ' + res.status);
+        };
+        // Padam semua wajah milik seorang subject (dipanggil semasa migrasi/padam pelajar)
+        window.cfDeleteSubject = async (studentId) => {
+            const c = window.getCfConf();
+            try {
+                await fetch(c.url + '/api/v1/recognition/faces?subject=' + encodeURIComponent(studentId),
+                    { method: 'DELETE', headers: { 'x-api-key': c.key } });
+            } catch (e) { /* senyap — padam tempatan tetap berjalan */ }
+        };
+        // Baris kehadiran jatuh ke "Semakan Manual" bila similarity berada dalam jalur kelabu
+        window.tandaSemakanManual = (f, programId) => {
+            const pid = programId || state.attendanceProgram;
+            if (!window.__cfReview) window.__cfReview = [];
+            // satu baris sahaja per pelajar per program
+            window.__cfReview = window.__cfReview.filter(x => !(String(x.programId) === String(pid) && String(x.subject) === String(f.subject)));
+            window.__cfReview.push({ programId: pid, subject: f.subject, name: (window.cfNameMap || {})[f.subject] || f.subject, similarity: f.similarity, t: Date.now() });
+            window.renderCfReview && window.renderCfReview();
+        };
+        window.renderCfReview = () => {
+            const el = document.getElementById('cf-review-list');
+            if (!el) return;
+            if (!window.__cfReview || !window.__cfReview.length) { el.innerHTML = '<p class="text-xs text-gray-400 italic py-2">Tiada rekod menunggu semakan.</p>'; return; }
+            el.innerHTML = window.__cfReview.slice(-12).reverse().map(r => `
+                <div class="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl p-2.5 mb-1.5">
+                    <i class="fas fa-user-clock text-amber-500"></i>
+                    <div class="min-w-0 flex-grow">
+                        <p class="font-bold text-sm text-gray-900 truncate">${r.name}</p>
+                        <p class="text-[10px] text-amber-700 font-bold">${(r.similarity * 100).toFixed(0)}% — dalam jalur kelabu (68–80%)</p>
+                    </div>
+                    <button onclick="window.cfApproveReview('${r.subject}', '${r.programId}')" class="text-[10px] font-black bg-green-600 hover:bg-green-700 text-white px-2.5 py-1.5 rounded-lg transition flex-shrink-0"><i class="fas fa-check mr-0.5"></i>Lulus</button>
+                    <button onclick="window.cfRejectReview('${r.subject}', '${r.programId}')" class="text-[10px] font-black bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg transition flex-shrink-0"><i class="fas fa-times mr-0.5"></i>Tolak</button>
+                </div>`).join('');
+        };
+        window.cfApproveReview = (subject, programId) => {
+            const r = (window.__cfReview || []).find(x => String(x.subject) === String(subject) && String(x.programId) === String(programId));
+            if (!r) return;
+            window.__cfReview = window.__cfReview.filter(x => x !== r);
+            // Diluluskan operator — rekod ditulis dengan kaedah 'compreFace' + keyakinan asal
+            const progSedia = state.attendanceProgram;
+            state.attendanceProgram = programId; // markAttendance mengikut program semasa
+            window.markAttendance(subject, { confidence: r.similarity, method: 'compreFace' }).then(() => {
+                state.attendanceProgram = progSedia;
+            });
+            window.renderCfReview();
+        };
+        window.cfRejectReview = (subject, programId) => {
+            window.__cfReview = (window.__cfReview || []).filter(x => !(String(x.subject) === String(subject) && String(x.programId) === String(programId)));
+        window.renderCfReview();
+        };
+
         window.selectAttendanceProgram = (id) => {
             state.attendanceProgram = id;
             router();
+        };
+
+        // REKOD MANUAL: pelajar yang wajahnya gagal dikenali (cahaya/kembar/cermin) masih
+        // boleh direkod oleh operator — kaedah 'manual-qr' pada rekod untuk audit
+        window.markManualAttendance = () => {
+            const sel = document.getElementById('manual-att-student');
+            if (!sel || !sel.value) { showToast('Pilih pelajar dahulu.', 'error'); return; }
+            window.markAttendance(sel.value, { confidence: null, method: 'manual-qr' });
         };
 
         const getCameraStream = async (videoId) => {
@@ -6951,6 +7347,33 @@
             if (!programId) { showToast('Sila pilih program dahulu.', 'error'); return; }
             const statusEl = document.getElementById('scan-status');
 
+            // DATE-GUARD: operator tidak lagi boleh merekod 300 pelajar ke minggu PMI yang
+            // salah secara senyap — minggu hadapan disekat keras, minggu lepas mesti
+            // disahkan eksplisit (sesi ganti), program biasa diberi amaran lembut.
+            const todayIso = new Date().toLocaleDateString('en-CA');
+            const progGuard = window.resolveProgram(programId);
+            if (programId.startsWith('pmi-')) {
+                const wk = programId.slice(4);
+                if (wk > todayIso) {
+                    showToast('BERHENTI: minggu PMI ini belum tiba! Pilih minggu hari ini sebelum imbas.', 'error');
+                    return;
+                }
+                if (wk < todayIso) {
+                    const hariIniW = window.getPMIWeeks(state.filterYear, state.filterSession).find(w => w.date === todayIso);
+                    const disengajakan = window.confirm(
+                        `Minggu PMI ${wk} telah LALU (${wk}).\n` +
+                        (hariIniW ? `Minggu hari ini ialah ${hariIniW.week} (${todayIso}).\n` : '') +
+                        `Rekod 300 pelajar akan ditulis ke minggu ${wk}.\n\n` +
+                        `OK = disengajakan (sesi ganti) · Batal = berhenti`
+                    );
+                    if (!disengajakan) { showToast('Imbasan dibatalkan — pilih minggu hari ini.', 'info'); return; }
+                    if (statusEl) statusEl.textContent = `Imbasan ke minggu LALU ${wk} — diluluskan operator`;
+                }
+            } else if (progGuard && progGuard.date && progGuard.date < todayIso && Math.abs(new Date(todayIso) - new Date(progGuard.date)) > 7 * 86400000) {
+                // Program biasa > 7 hari lepas — kemungkinan rekod bertulis ke sesi salah
+                if (!window.confirm(`Program "${progGuard.title}" berlangsung pada ${progGuard.date} (${Math.round((new Date(todayIso) - new Date(progGuard.date)) / 86400000)} hari lalu).\n\nOK = teruskan imbasan · Batal = berhenti`)) return;
+            }
+
             // Guard: elak imbasan berganda (klik 2x)
             if (scanActive) { showToast('Imbasan sedang berjalan.', 'info'); return; }
 
@@ -6958,7 +7381,16 @@
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Memulakan...'; }
 
             try {
-                await window.loadFaceModels();
+                // Enjin hibrid: bila CompreFace sihat, model tempatan tidak wajib (pelayan
+                // buat pengesanan+pengecaman) — tetapi auto-enroll tempatan masih perlu ia.
+                // Jika pelayan tidak sihat/offline, jatuh balik penuh ke face-api.
+                const cfAktifAwal = await window.cfReady();
+                if (cfAktifAwal && await window.cfPing()) {
+                    showToast('Enjin CompreFace (ArcFace) aktif — ketepatan + liveness dipertingkat.', 'success');
+                    try { await window.loadFaceModels(); } catch (e) { /* pelayan buat kerja utama */ }
+                } else {
+                    await window.loadFaceModels();
+                }
                 buildFaceMatcher();
 
                 // AUTO-PENDAFTARAN LATAR BELAKANG: jangan sekat kamera — jana data wajah
@@ -6999,18 +7431,30 @@
                 const displaySize = { width: video.videoWidth || 640, height: video.videoHeight || 480 };
                 faceapi.matchDimensions(canvas, displaySize);
 
-                // Peta ID -> nama untuk label kotak yang mesra pengguna
+                // Peta ID -> nama untuk label kotak yang mesra pengguna (dikongsi kedua-dua laluan)
                 const nameMap = {};
                 (DB.students || []).forEach(s => { nameMap[String(s.id)] = s.name; });
+                window.cfNameMap = nameMap; // laluan CompreFace membaca peta sama
 
-                // Padanan ketat: pulang 'unknown' kecuali (a) jarak ≤ 0.45, dan
-                // (b) padanan terbaik sekurang-kurangnya 0.04 lebih hampir daripada
+                // Enjin CompreFace aktif? Model face-api tidak wajib dimuat (pelayan buat kerja);
+                // fallback masih sedia bila pelayan gugur mid-imbasan (dimuat atas permintaan)
+                const cfAktif = await window.cfReady();
+                if (cfAktif && (await window.cfPing())) {
+                    if (statusEl) statusEl.textContent = 'Imbasan aktif · enjin CompreFace (ArcFace)...';
+                } else if (cfAktif) {
+                    showToast('CompreFace tidak dapat dicapai — enjin tempatan digunakan.', 'info');
+                }
+
+                // Padanan ketat: pulang 'unknown' kecuali (a) jarak ≤ threshold, dan
+                // (b) padanan terbaik sekurang-kurangnya margin lebih hampir daripada
                 // pelajar LAIN terdekat (elak salah kenal antara wajah serupa),
-                // dan (c) wajah cukup besar/dekat di skrin (kotak ≥ 80px).
+                // dan (c) wajah cukup besar/dekat di skrin (kotak ≥ minimum).
                 // Jika kamera kurang pasti → 'unknown', BUKAN meneka nama pelajar lain.
-                const MATCH_THRESHOLD = 0.45; // lebih ketat — jika kamera kurang pasti, papar 'unknown' bukan teka nama lain
-                const MATCH_MARGIN = 0.04;
-                const MIN_BOX_PX = 80;
+                // PENALAAN 300 WAJAH: 0.43/0.05/100px — kohort besar perlukan ruang lebih ketat;
+                // satu frame bising tidak lagi boleh melabelkan nama orang lain.
+                const MATCH_THRESHOLD = 0.43;
+                const MATCH_MARGIN = 0.05;
+                const MIN_BOX_PX = 100;
                 const matchFace = (desc) => {
                     let best = null, bestOther = Infinity;
                     for (const ld of (faceMatcher.labeledDescriptors || [])) {
@@ -7038,6 +7482,52 @@
                     if (window.__scanBusy) return; // SSD lebih teliti tetapi lebih berat — elak kitaran bertindih
                     window.__scanBusy = true;
                     try {
+                        // ===== LALUAN 1: COMPREFACE (ArcFace) — enjin utama bila talian & pelayan sihat =====
+                        if (await window.cfReady()) {
+                            try {
+                                const faces = await window.cfRecognize(video);
+                                const ctx = canvas.getContext('2d');
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                const c = window.getCfConf();
+                                const sc = canvas.width / 640; // skala koordinat CompreFace -> kanvas
+                                for (const f of faces) {
+                                    const ok = f.subject && f.similarity >= c.minSimilarity && f.liveness === 1;
+                                    const dalamJalur = f.subject && f.similarity >= c.reviewBand && f.similarity < c.minSimilarity;
+                                    ctx.strokeStyle = ok ? '#22c55e' : (dalamJalur ? '#f59e0b' : '#ef4444');
+                                    ctx.lineWidth = 3;
+                                    ctx.strokeRect(f.box.x * sc, f.box.y * sc, f.box.width * sc, f.box.height * sc);
+                                    ctx.fillStyle = ok ? '#22c55e' : (dalamJalur ? '#f59e0b' : '#ef4444');
+                                    ctx.font = 'bold 14px Inter, sans-serif';
+                                    const tag = ok
+                                        ? ((window.cfNameMap[f.subject] || f.subject) + ' ' + (f.similarity * 100).toFixed(0) + '%')
+                                        : (f.liveness !== 1 ? 'FOTO DITOLAK (liveness)' : (dalamJalur ? 'SEM: ' + (window.cfNameMap[f.subject] || f.subject) + ' ' + (f.similarity * 100).toFixed(0) + '%' : 'Tidak dikenali'));
+                                    ctx.fillText(tag, f.box.x * sc, Math.max(14, f.box.y * sc - 6));
+                                    if (!f.subject || f.similarity < c.reviewBand || f.liveness !== 1) continue;
+                                    if (dalamJalur) { window.tandaSemakanManual(f); continue; } // jalur kelabu: operator sah yang lulus
+                                    // kekal pengesahan 2-frame (ArcFace pantas — 2 frame berturut ~0.5-1s)
+                                    const confirms = window.__scanConfirms || (window.__scanConfirms = new Map());
+                                    const cfm = confirms.get(f.subject) || { n: 0, t: 0 };
+                                    const nowCf = Date.now();
+                                    cfm.n = (nowCf - cfm.t < 7000) ? cfm.n + 1 : 1;
+                                    cfm.t = nowCf;
+                                    confirms.set(f.subject, cfm);
+                                    if (cfm.n >= 2 && !inFlight.has(f.subject)) {
+                                        inFlight.add(f.subject);
+                                        try { await window.markAttendance(f.subject, { confidence: f.similarity, method: 'compreFace' }); }
+                                        finally { setTimeout(() => inFlight.delete(f.subject), 5000); }
+                                    }
+                                }
+                                window.__cfFrameOk = Date.now(); // tanda pelayan sihat
+                                return;
+                            } catch (e) {
+                                // CompreFace tidak capai/timeout — jatuh ke laluan face-api frame ini
+                                if (!window.__cfWarned || Date.now() - window.__cfWarned > 60000) {
+                                    window.__cfWarned = Date.now();
+                                    showToast('CompreFace tidak dapat dicapai — fallback enjin tempatan digunakan.', 'info');
+                                }
+                            }
+                        }
+                        // ===== LALUAN 2: FACE-API.JS (fallback offline / pelayan tidak sihat) =====
                         const detections = await faceapi.detectAllFaces(video, window.__opsiPengesanImbas())
                             .withFaceLandmarks()
                             .withFaceDescriptors();
@@ -7066,6 +7556,23 @@
                                     new faceapi.draw.DrawBox(det.detection.box, { label: 'Sila pandang kamera', boxColor: 'orange' }).draw(canvas);
                                     continue;
                                 }
+                                // LIVENESS EIP-RASIO (EAR): foto skrin tidak berkedip — rekod hanya
+                                // ditulis bila EAR pernah JATUH <0.18 lalu pulih ≥0.26 dalam ≤4 saat
+                                // (kejutan berkedip sebenar). State disimpan per pelajar.
+                                const earMata = (e) => (Math.hypot(e[1].x - e[5].x, e[1].y - e[5].y) + Math.hypot(e[2].x - e[4].x, e[2].y - e[4].y)) / (2 * Math.hypot(e[0].x - e[3].x, e[0].y - e[3].y));
+                                const ear = (earMata(mataKiri) + earMata(mataKanan)) / 2;
+                                const blinks = window.__scanBlinks || (window.__scanBlinks = new Map());
+                                const b = blinks.get(best.label) || { closed: false, blinkAt: 0 };
+                                if (ear < 0.18 && !b.closed) { b.closed = true; }
+                                else if (ear >= 0.26 && b.closed) {
+                                    b.closed = false;
+                                    if (!b.blinkAt || Date.now() - b.blinkAt > 1000) b.blinkAt = Date.now();
+                                }
+                                blinks.set(best.label, b);
+                                if (!b.blinkAt) {
+                                    new faceapi.draw.DrawBox(det.detection.box, { label: 'Berkedip untuk sahkan', boxColor: 'orange' }).draw(canvas);
+                                    continue;
+                                }
                             }
                             // Jika matcher belum sedia (data wajah sedang dijana di latar), lukis kotak sahaja
                             if (!faceMatcher) {
@@ -7088,13 +7595,24 @@
                                 }
                             }
 
-                            if (isKnown && !inFlight.has(best.label)) {
-                                inFlight.add(best.label);
-                                try {
-                                    await window.markAttendance(best.label);
-                                } finally {
-                                    // Lepaskan selepas beberapa saat supaya rekod semak duplikasi server masih berfungsi
-                                    setTimeout(() => inFlight.delete(best.label), 5000);
+                            // PENGESAHAN 2-FRAME: rekod hanya ditulis bila padanan KEEKAL
+                            // 2 frame berturut-turut (dalam 7 saat) — noise satu-frame dari
+                            // wajah seakan/cahaya lembut tidak lagi menulis rekod salah.
+                            const confirms = window.__scanConfirms || (window.__scanConfirms = new Map());
+                            if (isKnown) {
+                                const c = confirms.get(best.label) || { n: 0, t: 0 };
+                                const now2 = Date.now();
+                                c.n = (now2 - c.t < 7000) ? c.n + 1 : 1;
+                                c.t = now2;
+                                confirms.set(best.label, c);
+                                if (c.n >= 2 && !inFlight.has(best.label)) {
+                                    inFlight.add(best.label);
+                                    try {
+                                        await window.markAttendance(best.label, { confidence: Math.max(0, 1 - best.distance), method: 'faceApi' });
+                                    } finally {
+                                        // Lepaskan selepas beberapa saat supaya rekod semak duplikasi server masih berfungsi
+                                        setTimeout(() => inFlight.delete(best.label), 5000);
+                                    }
                                 }
                             }
                         }
@@ -7120,6 +7638,19 @@
         // Paparan besar keputusan imbasan — berjaya (5 saat, hijau) / gagal (merah + Cuba Semula) / sudah direkod (biru, 5 saat)
         window.showScanResult = (ok, name, note, dept) => {
             document.getElementById('scan-result-overlay')?.remove();
+            // SEMASA IMBASAN AKTIF (300 pelajar beratur): kejayaan cukup dengan jalur ringkas
+            // 1.8s di atas skrin — operator tidak buta 5 saat sekepala (25 minit hilang pada 300 orang).
+            // Overlay penuh kekal untuk kegagalan (butang Cuba Semula) & imbasan tunggal.
+            if (ok !== false && scanActive) {
+                const nama = (name || '');
+                const kod = dept || '';
+                const bar = document.createElement('div');
+                bar.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[120000] ' + (ok === 'done' ? 'bg-blue-600' : 'bg-green-600') + ' text-white font-black px-6 py-3 rounded-2xl shadow-2xl fade-in text-sm flex items-center gap-2 max-w-[90vw]';
+                bar.innerHTML = `<i class="fas ${ok === 'done' ? 'fa-check-double' : 'fa-check'} mr-1"></i><span class="truncate">${nama}</span>${kod ? `<span class="opacity-80 font-bold">· ${kod}</span>` : ''}<span class="opacity-80 font-semibold whitespace-nowrap">${ok === 'done' ? '— sudah direkodkan' : '— direkodkan' + (note ? ' ' + note : '')}</span>`;
+                document.body.appendChild(bar);
+                setTimeout(() => bar.remove(), 1800);
+                return;
+            }
             // Cari kod ringkas (JABATAN+SEM+KELAS cth: SFP1, DIK1A) jika tidak diberi
             if (!dept && name) {
                 const st = (DB.students || []).find(s => String(s.name).toLowerCase() === String(name).toLowerCase());
@@ -7170,7 +7701,7 @@
             document.body.appendChild(ov);
         };
 
-        window.markAttendance = (studentId) => {
+        window.markAttendance = (studentId, ev = {}) => {
             const programId = state.attendanceProgram;
             const program = window.resolveProgram(programId);
             const student = DB.students.find(s => String(s.id) === String(studentId));
@@ -7187,6 +7718,9 @@
                 programDate: program.date,                    // tarikh program (rujukan)
                 year: program.year,
                 session: program.session,
+                // BUKTI KEPUTUSAN — setiap rekod membawa keyakinan & kaedah supaya rekod salah boleh diaudit
+                confidence: ev.confidence != null ? ev.confidence : null, // CompreFace: similarity 0-1; faceApi: 1 - jarak
+                method: ev.method || 'faceApi',                            // 'compreFace' | 'faceApi' | 'manual-qr'
                 updatedBy: actorName()
             };
 
@@ -7214,10 +7748,8 @@
                             resolve(true);
                         })
                         .withFailureHandler(function() {
-                            // OFFLINE: simpan dalam gilir & sync bila talian kembali
-                            if (!window.__attQueue) window.__attQueue = [];
-                            window.__attQueue.push(formData);
-                            try { localStorage.setItem('surau_att_queue', JSON.stringify(window.__attQueue)); } catch (e) {}
+                            // OFFLINE: simpan dalam gilir (IndexedDB — kekal selepas reload) & sync bila talian kembali
+                            window.qPut(formData).catch(() => {});
                             DB.attendance.push({ id: 'att_' + Date.now(), ...formData, time: new Date().toLocaleTimeString('en-GB'), status: 'Hadir' });
                             window.refreshScanAttendees();
                             showToast(`${student.name} hadir! (offline — akan diselaraskan)`, 'info');
@@ -7858,11 +8390,13 @@
             const student = DB.students.find(s => String(s.id) === String(studentId));
             if (!student) { showToast('Rekod pelajar tidak ditemui. Mungkin telah dipadam.', 'error'); return; }
             const statusEl = document.getElementById('enroll-status');
+            // 6 sampel (2/2/1/1) — multi-sudut dikekalkan pada separuh saiz storan;
+            // 12 sampel x 300 pelajar melimpahkan kuota localStorage 5MB
             const POSES = [
-                { label: 'Hadap kamera terus (depan)', frames: 4 },
-                { label: 'Pusing kepala sedikit ke KIRI', frames: 3 },
-                { label: 'Pusing kepala sedikit ke KANAN', frames: 3 },
-                { label: 'Angkat dagu sedikit ke atas', frames: 2 }
+                { label: 'Hadap kamera terus (depan)', frames: 2 },
+                { label: 'Pusing kepala sedikit ke KIRI', frames: 2 },
+                { label: 'Pusing kepala sedikit ke KANAN', frames: 1 },
+                { label: 'Angkat dagu sedikit ke atas', frames: 1 }
             ];
             const detect = (v) => faceapi.detectSingleFace(v, window.__opsiPengesanDaftar())
                 .withFaceLandmarks().withFaceDescriptor();
@@ -7911,6 +8445,12 @@
                         if (p === 1 && !arahPertama) arahPertama = sema.arah || 0;
                         all.push(Array.from(det.descriptor));
                         got++;
+                        // PENDAFTARAN HIBRID: sampel pose dihantar ke CompreFace (ArcFace) serta-merta
+                        // bila pelayan aktif — galeri pusat dibina serentak dengan descriptor tempatan
+                        if (await window.cfReady()) {
+                            try { await window.cfEnrollPose(student, video); }
+                            catch (e) { showToast('CompreFace: gagal daftar pose — sampel tempatan tetap disimpan.', 'info'); }
+                        }
                         window.__lukisOvalMuka('enroll-face-guide', OV, `✓ ${got}/${pose.frames}`);
                         if (statusEl) statusEl.textContent = `Sudut ${p + 1}/${POSES.length}: ${pose.label} — ${got}/${pose.frames} ✓`;
                         await new Promise(r => setTimeout(r, 350)); // jarak antara sampel
@@ -7920,6 +8460,7 @@
                         if (statusEl) statusEl.textContent = 'Pendaftaran dibatalkan — tekan butang semula untuk cuba lagi.';
                         window.__setCipPose('enroll', p, 'kosong');
                         window.__lukisOvalMuka('enroll-face-guide', '#ef4444', 'Dibatalkan — cuba semula');
+                        stopCamera(); // jangan biarkan kamera menyala selepas gagal
                         return;
                     }
                     window.__setCipPose('enroll', p, 'siap');
@@ -7930,13 +8471,16 @@
             } catch (e) {
                 if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
                 showToast('Ralat kamera: ' + (e.message || e), 'error');
+                stopCamera(); // ralat kamera/timeout — pastikan lampu kamera padam
             }
         };
 
         // Simpan cap wajah (dikongsi oleh captureFace & enrollFromPhoto)
         window.__persistFaceDescriptor = (student, descriptor) => {
-            const formData = { studentId: student.id, name: student.name, dept: student.dept, descriptor: descriptor };
-            const item = { studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(descriptor) };
+            // Bungkus sebagai base64 Float32 — 5x lebih kecil, muat laluan GET shim GAS
+            const packed = descriptor.map(packDesc);
+            const formData = { studentId: student.id, name: student.name, dept: student.dept, descriptor: packed };
+            const item = { studentId: student.id, name: student.name, dept: student.dept, descriptor: JSON.stringify(packed) };
             const updLocal = () => {
                 const idx = DB.faceDescriptors.findIndex(d => String(d.studentId) === String(student.id));
                 if (idx !== -1) DB.faceDescriptors[idx] = item; else DB.faceDescriptors.push(item);
@@ -7993,7 +8537,7 @@
                     showToast('Tiada wajah dikesan dalam gambar profil. Guna gambar wajah yang jelas menghadap kamera, atau daftar melalui kamera.', 'error');
                     return;
                 }
-                window.__persistFaceDescriptor(student, Array.from(detection.descriptor));
+                window.__persistFaceDescriptor(student, [Array.from(detection.descriptor)]);
             } catch (e) {
                 if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
                 showToast('Ralat daftar dari gambar: ' + (e.message || e), 'error');
@@ -8007,21 +8551,7 @@
         });
 
         // Sync gilir kehadiran offline bila talian internet kembali
-        window.addEventListener('online', () => {
-            if (!window.__attQueue || !window.__attQueue.length) return;
-            if (typeof google === 'undefined' || !google.script || !google.script.run) return;
-            const queue = [...window.__attQueue];
-            window.__attQueue = [];
-            try { localStorage.setItem('surau_att_queue', '[]'); } catch (e) {}
-            queue.forEach(fd => {
-                google.script.run.withFailureHandler(function() {
-                    // gagal lagi — masuk semula ke gilir
-                    window.__attQueue.push(fd);
-                    try { localStorage.setItem('surau_att_queue', JSON.stringify(window.__attQueue)); } catch (e) {}
-                }).recordAttendance(fd);
-            });
-            showToast('Talian kembali — ' + queue.length + ' rekod kehadiran offline sedang diselaraskan.', 'info');
-        });
+        window.addEventListener('online', () => { window.flushAttQueue(); });
 
         const router = async () => {
             const rawHash = window.location.hash.slice(1) || 'home';
@@ -8182,7 +8712,7 @@
             if ('serviceWorker' in navigator) {
                 try {
                     const swCode = `
-                        const CACHE_NAME = 'surau-dato-v2';
+                        const CACHE_NAME = 'surau-dato-v3'; // model .bin shard kini di pra-cache
                         // Senarai aset CDN untuk pra-cache (termasuk model wajah — supaya imbasan berfungsi offline)
                         const PRE_CACHE = [
                             'https://cdn.tailwindcss.com',
@@ -8193,7 +8723,13 @@
                             'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/tiny_face_detector_model-weights_manifest.json',
                             'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/ssd_mobilenetv1_model-weights_manifest.json',
                             'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/face_landmark_68_model-weights_manifest.json',
-                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/face_recognition_model-weights_manifest.json'
+                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/face_recognition_model-weights_manifest.json',
+                            // SHARD BERAT .bin (~12MB): tanpa ini, imbasan "offline" gagal
+                            // kerana fail manifest dicache tetapi timbangan model TIDAK
+                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/tiny_face_detector_model.bin',
+                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/ssd_mobilenetv1_model.bin',
+                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/face_landmark_68_model.bin',
+                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/face_recognition_model.bin'
                         ];
                         self.addEventListener('install', (e) => {
                             e.waitUntil(caches.open(CACHE_NAME).then(c => Promise.allSettled(PRE_CACHE.map(u => c.add(u)))).then(() => self.skipWaiting()));
