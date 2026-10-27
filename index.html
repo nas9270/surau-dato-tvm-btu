@@ -796,6 +796,8 @@
                 if (!queue.length) return 0;
                 let sent = 0;
                 for (const rec of queue) {
+                    // Buang kunci dalaman gilir (qid) supaya tidak masuk kolum Sheet
+                    const { qid, ...payload } = rec;
                     await new Promise((resolve) => {
                         let selesai = false;
                         const tamat = setTimeout(() => { if (!selesai) { selesai = true; resolve(); } }, 8000);
@@ -808,7 +810,7 @@
                                 if (selesai) return; selesai = true; clearTimeout(tamat);
                                 resolve(); // kekal dalam gilir
                             })
-                            .recordAttendance(rec);
+                            .recordAttendance(payload);
                     });
                 }
                 if (sent > 0) showToast(sent + ' rekod kehadiran offline diselaraskan ke pelayan.', 'info');
@@ -4995,6 +4997,10 @@
                             <div class="bg-white rounded-2xl border shadow-sm p-5 mb-4">
                                 <h3 class="font-bold text-gray-900 mb-3 border-b pb-2 flex items-center gap-2"><i class="fas fa-microchip text-primary-600"></i> Enjin Pengecaman</h3>
                                 <div id="cf-engine-status" class="text-xs font-bold text-gray-500">Memeriksa...</div>
+                                <div class="flex gap-2 mt-3">
+                                    <button onclick="window.jalankanAuditWajah()" class="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5"><i class="fas fa-stethoscope"></i> Audit Galeri Wajah</button>
+                                </div>
+                                <div id="face-audit-result" class="mt-2 text-xs"></div>
                             </div>
                             <div class="bg-white rounded-2xl border shadow-sm p-5 mb-4">
                                 <h3 class="font-bold text-gray-900 mb-3 border-b pb-2">Program Dipilih</h3>
@@ -7076,10 +7082,12 @@
                     return new faceapi.LabeledFaceDescriptors(String(d.studentId), list.map(a => new Float32Array(a)));
                 } catch (e) { return null; }
             }).filter(Boolean);
-            // threshold: nilai lebih kecil = lebih ketat (hanya padanan sangat rapat diterima).
-            // 0.50: seimbang — 0.45 terlalu ketat di lapangan, 0.55 asal menyebabkan salah kenal
-            // (muka orang lain keluar nama orang lain) dengan 230+ wajah berdaftar.
-            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.45) : null;
+            // threshold FaceMatcher: nilai KECIL = lebih KETAT. Matcher objek ini tidak
+            // digunakan untuk keputusan rekod (matchFace kita sendiri yang menentukan) —
+            // ia cuma pembungkus galeri; 0.40 dikekalkan ketat supaya tiada laluan senyap.
+            // Salah nama lapangan datang dari sampel bertindih + threshold longgar,
+            // bukan bilangan sampel — penalaan 0.43/0.05 di matchFace ialah kawalan sebenar.
+            faceMatcher = labeled.length ? new faceapi.FaceMatcher(labeled, 0.40) : null;
             return faceMatcher;
         };
 
@@ -7342,6 +7350,72 @@
             return { done, total: targets.length, failed };
         };
 
+        // === AUDIT GALERI WAJAH — alat pembasmi salah nama ===
+        // Pencemar utama salah nama lapangan: sampel ROSAK/ZAMAN-LAMA dalam galeri
+        // (descriptor pendek, JSON terpotong, sampel bukan-128, base64 salah panjang).
+        // Satu sampah sahaja cukup untuk jarak minimum "menang" dan nama salah keluar.
+        // Fungsi ini imbas seluruh galeri, laporkan rosak, dan boleh buang serentak.
+        window.auditFaceData = () => {
+            const hasil = { total: 0, sihat: 0, rosak: [], pelajar: [] };
+            (DB.faceDescriptors || []).forEach(d => {
+                hasil.total++;
+                let arr;
+                try { arr = typeof d.descriptor === 'string' ? JSON.parse(d.descriptor) : d.descriptor; } catch (e) { hasil.rosak.push({ studentId: d.studentId, name: d.name, sebab: 'JSON terpotong/rosak' }); return; }
+                if (!Array.isArray(arr) || arr.length === 0) { hasil.rosak.push({ studentId: d.studentId, name: d.name, sebab: 'kosong/bukan array' }); return; }
+                if (typeof arr[0] === 'string') {
+                    // base64: setiap sampel mesti 684 aksara
+                    const buruk = arr.filter(s => typeof s !== 'string' || s.length !== 684).length;
+                    if (buruk) { hasil.rosak.push({ studentId: d.studentId, name: d.name, sebab: buruk + ' sampel base64 salah panjang' }); return; }
+                } else if (Array.isArray(arr[0])) {
+                    const buruk = arr.filter(s => !Array.isArray(s) || s.length !== 128).length;
+                    if (buruk) { hasil.rosak.push({ studentId: d.studentId, name: d.name, sebab: buruk + ' sampel bukan 128 dimensi' }); return; }
+                } else if (arr.length !== 128) {
+                    hasil.rosak.push({ studentId: d.studentId, name: d.name, sebab: 'sampel tunggal bukan 128 dimensi' }); return;
+                }
+                hasil.sihat++;
+                hasil.pelajar.push({ studentId: d.studentId, name: d.name, sampel: arr.length });
+            });
+            return hasil;
+        };
+
+        // Buang semua rekod wajah rosak dari memori + pelayan (GAS tolak semasa simpan semula)
+        window.buangWajahRosak = async () => {
+            const audit = window.auditFaceData();
+            if (!audit.rosak.length) { showToast('Galeri wajah bersih — tiada rekod rosak.', 'success'); return; }
+            const ids = new Set(audit.rosak.map(r => String(r.studentId)));
+            DB.faceDescriptors = (DB.faceDescriptors || []).filter(d => !ids.has(String(d.studentId)));
+            buildFaceMatcher();
+            showToast(audit.rosak.length + ' rekod wajah rosak dibuang — daftar semula pelajar terlibat.', 'success');
+            // Padam di pelayan satu persatu (senyap)
+            audit.rosak.forEach(r => {
+                const rec = { studentId: r.studentId, name: r.name, descriptor: [] };
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    // descriptor kosong akan DITOLAK oleh validasi GAS — jadi padam baris sahaja
+                    try { google.script.run.withFailureHandler(function() {}).deleteRecord('FaceDescriptors', 'fd_' + r.studentId); } catch (e) {}
+                }
+            });
+            return audit.rosak.length;
+        };
+
+        // UI audit: jalankan + papar keputusan + butang buang serentak
+        window.jalankanAuditWajah = () => {
+            const el = document.getElementById('face-audit-result');
+            if (!el) return;
+            const a = window.auditFaceData();
+            if (a.rosak.length === 0) {
+                el.innerHTML = `<span class="text-green-700 font-bold"><i class="fas fa-check-circle mr-1"></i>Galeri bersih: ${a.sihat}/${a.total} rekod sihat.</span>`;
+                return;
+            }
+            el.innerHTML = `
+                <div class="text-red-700 font-bold mb-1.5"><i class="fas fa-exclamation-triangle mr-1"></i>${a.rosak.length} rekod ROSAK (punca salah nama):</div>
+                <div class="max-h-32 overflow-y-auto bg-red-50 border border-red-100 rounded-lg p-2 mb-2">
+                    ${a.rosak.slice(0, 15).map(r => `<p class="text-[11px] text-red-800 font-semibold truncate">${r.name || r.studentId} — ${r.sebab}</p>`).join('')}
+                    ${a.rosak.length > 15 ? `<p class="text-[10px] text-red-500 italic">...+${a.rosak.length - 15} lagi</p>` : ''}
+                </div>
+                <button onclick="window.buangWajahRosak().then(n => { if (n) window.jalankanAuditWajah(); })" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition"><i class="fas fa-broom mr-1"></i> Buang ${a.rosak.length} Rekod Rosak & Daftar Semula Pelajar Ini</button>
+                <p class="text-[10px] text-gray-500 italic mt-1.5">Rekod rosak ialah sampel zaman lama yang herot (JSON terpotong, dimensi salah). Selepas dibuang, daftar semula pelajar terlibat melalui kamera.</p>`;
+        };
+
         window.startFaceScan = async () => {
             const programId = state.attendanceProgram;
             if (!programId) { showToast('Sila pilih program dahulu.', 'error'); return; }
@@ -7452,9 +7526,16 @@
                 // Jika kamera kurang pasti → 'unknown', BUKAN meneka nama pelajar lain.
                 // PENALAAN 300 WAJAH: 0.43/0.05/100px — kohort besar perlukan ruang lebih ketat;
                 // satu frame bising tidak lagi boleh melabelkan nama orang lain.
-                const MATCH_THRESHOLD = 0.43;
-                const MATCH_MARGIN = 0.05;
-                const MIN_BOX_PX = 100;
+                // MOD "PADANAN TEPAT SAHAJA" — anti salah nama maksimum:
+                // threshold 0.38 = hanya wajah yang HAMPIR PERSIS dengan sampel didaftarkan
+                // lulus; margin 0.07 = pelajar lain terdekat mesti jauh berbeza. Kesan:
+                // salah nama hampir mustahil; kontra — cahaya/pose luar biasa akan
+                // "Tidak dikenali" → pelajar cuba lagi (2 saat) atau Rekod Manual.
+                // Penalaan: naikkan ke 0.40 jika terlalu banyak gagal; turunkan ke 0.36
+                // jika masih ada salah nama. 0.38 ialah titik paling ketat yang masih praktikal.
+                const MATCH_THRESHOLD = 0.38;
+                const MATCH_MARGIN = 0.07;
+                const MIN_BOX_PX = 110;
                 const matchFace = (desc) => {
                     let best = null, bestOther = Infinity;
                     for (const ld of (faceMatcher.labeledDescriptors || [])) {
