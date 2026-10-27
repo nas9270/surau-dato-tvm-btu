@@ -4465,11 +4465,10 @@
                 const programs = DB.programs.filter(p => String(p.year) === String(state.filterYear) && p.session === state.filterSession && p.status === 'Published');
                 // Tapis kehadiran kepada sesi semasa sahaja
                 const sesiIdsAtt = new Set(DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession).map(s => String(s.id)));
-                const attendance = (DB.attendance || []).filter(a => {
-                    if (sesiIdsAtt.has(String(a.studentId))) return true;
-                    if (a.year && a.session) return String(a.year) === String(state.filterYear) && a.session === state.filterSession;
-                    return false;
-                });
+                // FIX DATA TIDAK TEPAT: hanya rekod pelajar SEBENAR dikira.
+                // Rekod sampah (studentId = nama jabatan sisa ujian, tiada nama) tidak
+                // lagi menggelembungkan kiraan "hadir" pada minggu yang tiada imbasan.
+                const attendance = (DB.attendance || []).filter(a => sesiIdsAtt.has(String(a.studentId)));
                 const descriptors = DB.faceDescriptors || [];
 
                 // === PMI: jadual mingguan setiap Jumaat (auto mengikut sesi semasa) ===
@@ -4622,11 +4621,8 @@
                 const allStudents = DB.students.filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession);
                 // Tapis rekod kehadiran kepada sesi semasa sahaja — elak data sesi lepas/yatim celaru
                 const sesiIds = new Set(allStudents.map(s => String(s.id)));
-                const attendance = (DB.attendance || []).filter(a => {
-                    if (sesiIds.has(String(a.studentId))) return true;
-                    if (a.year && a.session) return String(a.year) === String(state.filterYear) && a.session === state.filterSession;
-                    return false;
-                });
+                // FIX DATA TIDAK TEPAT: hanya rekod pelajar SEBENAR dikira (roster sesi semasa)
+                const attendance = (DB.attendance || []).filter(a => sesiIds.has(String(a.studentId)));
                 const excusedSesi = (DB.excusedAbsences || []).filter(e => sesiIds.has(String(e.studentId)) || (e.year && e.session && String(e.year) === String(state.filterYear) && e.session === state.filterSession));
                 const programs = DB.programs.filter(p => String(p.year) === String(state.filterYear) && p.session === state.filterSession);
                 const pmiWeeks = window.getPMIWeeks(state.filterYear, state.filterSession);
@@ -5043,7 +5039,7 @@
 
                             <div class="bg-white rounded-2xl border shadow-sm p-5">
                                 <div class="flex justify-between items-center mb-3 border-b pb-2">
-                                    <h3 class="font-bold text-gray-900">Hadir (${attendedList.length})</h3>
+                                    <h3 class="font-bold text-gray-900" id="scan-attend-count">Hadir (${attendedList.length})</h3>
                                 </div>
                                 <div id="scan-attendees" class="space-y-2 max-h-[380px] overflow-y-auto">
                                     ${attendedList.map(a => `<div class="flex items-center gap-3 bg-green-50 rounded-xl p-2.5 border border-green-100"><i class="fas fa-check-circle text-green-600"></i><div class="min-w-0"><p class="font-bold text-gray-900 text-sm truncate">${a.name}</p><p class="text-xs text-gray-500">${a.dept} · ${a.time || ''}</p></div></div>`).join('') || '<p class="text-xs text-gray-400 italic">Belum ada rekod kehadiran.</p>'}
@@ -6779,6 +6775,43 @@
                     }
                     window.__setCipPose('member', p, 'siap');
                 }
+                // === SEKAT WAJAH SAMA — wajah yang sudah ada dalam galeri TIDAK boleh
+                // didaftarkan kali kedua. Dua ID berkongsi satu wajah = margin pengesahan
+                // melihat dua jarak serupa = wajah "Tidak dikenali" KEKAL selepas kelulusan.
+                // Perbandingan: 6 sampel baharu vs setiap sampel pelajar sesi semasa.
+                window.__memberFaceDup = false;
+                let wajahPadan = null, jarakTerbaik = Infinity;
+                try {
+                    const sesiIds = new Set((DB.students || [])
+                        .filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession)
+                        .map(s => String(s.id)));
+                    const galeri = (DB.faceDescriptors || []).filter(d => sesiIds.has(String(d.studentId)));
+                    for (const g of galeri) {
+                        let sampelGaleri;
+                        try { sampelGaleri = normDesc(g.descriptor); } catch (e2) { continue; }
+                        for (const smp of sampelGaleri) {
+                            const f32 = new Float32Array(smp);
+                            for (const baru of all) {
+                                const d = faceapi.euclideanDistance(new Float32Array(baru), f32);
+                                if (d < jarakTerbaik) { jarakTerbaik = d; wajahPadan = g; }
+                            }
+                        }
+                    }
+                } catch (e) { /* galeri kosong/rosak — biarkan laluan terbuka */ }
+                if (wajahPadan && jarakTerbaik <= 0.42) {
+                    const st = (DB.students || []).find(s => String(s.id) === String(wajahPadan.studentId));
+                    const namaPadan = st ? st.name : 'pelajar berdaftar';
+                    window.__memberFaceDup = true;
+                    document.getElementById('member-face-data').value = '';
+                    document.getElementById('member-photo-data').value = '';
+                    const pvPadam = document.getElementById('member-photo-preview');
+                    if (pvPadam) { pvPadam.src = ''; pvPadam.classList.add('hidden'); }
+                    setStat(`Wajah ini SUDAH berdaftar sebagai ${namaPadan} — satu wajah, satu rekod.`);
+                    window.__lukisOvalMuka('member-face-guide', '#ef4444', 'WAJAH SUDAH BERDAFTAR');
+                    showToast(`Wajah ini sudah berdaftar sebagai ${namaPadan}. Satu wajah = satu rekod — hubungi admin untuk kemaskini semester/sesi.`, 'error');
+                    stopCamera();
+                    return;
+                }
                 document.getElementById('member-face-data').value = JSON.stringify(all);
                 setStat(`Selesai! ${all.length} sampel wajah (${POSES.length} sudut) berjaya diimbas.`);
                 window.__lukisOvalMuka('member-face-guide', OV, '✓ SEMUA SUDUT SELESAI');
@@ -6802,13 +6835,18 @@
             const faceData = document.getElementById('member-face-data')?.value || '';
             if (!isValidPhone(phone)) { showToast('No. Telefon tidak sah. Mesti bermula dengan 0 dan 9-12 digit.', 'error'); return; }
             if (!faceData) { showToast('Wajah belum diimbas. Tekan butang "Mula Imbasan Wajah" dan ikut arahan di skrin.', 'error'); return; }
-            // Sekat permohonan berkembar: nama + telefon sama 100% (dalam permohonan menunggu ATAU sudah jadi pelajar)
+            if (window.__memberFaceDup) { showToast('Wajah ini sudah berdaftar. Satu wajah = satu rekod. Hubungi admin untuk kemaskini.', 'error'); return; }
+            // SEKAT NAMA SAMA — satu nama hanya boleh wujud SEKALI (menunggu ATAU sudah
+            // jadi pelajar), TANPA mengira telefon/semester/sesi. Mendaftar dua kali dengan
+            // wajah sama menghasilkan dua ID dalam galeri wajah = margin pengesahan melihat
+            // dua jarak serupa = wajah keluar "Tidak dikenali" KEKAL. Nama berbeza orang
+            // sebenar ditambah oleh admin melalui borang Tambah Pelajar (laluan admin sahaja).
             const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
             const nameN = norm(form.elements['name'].value);
-            const dupPending = (DB.pendingMembers || []).some(p => norm(p.name) === nameN && String(p.phone) === phone);
-            const dupStudent = (DB.students || []).some(s => norm(s.name) === nameN && String(s.phone || '') === phone);
-            if (dupPending) { showToast('Permohonan dengan butiran yang sama telahpun dihantar dan sedang menunggu kelulusan admin.', 'error'); return; }
-            if (dupStudent) { showToast('Butiran ini telahpun berdaftar sebagai ahli/pelajar. Tiada permohonan baharu diperlukan.', 'error'); return; }
+            const dupNamaPending = (DB.pendingMembers || []).some(p => norm(p.name) === nameN);
+            const dupNamaStudent = (DB.students || []).some(s => norm(s.name) === nameN);
+            if (dupNamaPending) { showToast('Nama ini telahpun menghantar permohonan dan sedang menunggu kelulusan admin. Satu nama = satu permohonan sahaja.', 'error'); return; }
+            if (dupNamaStudent) { showToast('Nama ini sudah berdaftar sebagai ahli/pelajar surau. Jika ini anda dan mahu kemaskini semester/sesi, sila hubungi admin — JANGAN daftar baharu (rekod bertindih membuatkan wajah anda tidak dapat diimbas).', 'error'); return; }
             const data = {
                 id: 'pm_' + Date.now(),
                 name: form.elements['name'].value.trim(),
@@ -6831,6 +6869,15 @@
                 // Jika pelayan sibuk (ramai mendaftar serentak), cuba semula automatik sehingga 3 kali
                 const cubaHantar = (percubaan) => {
                     google.script.run
+                        .withSuccessHandler(function(result) {
+                            // Pelayan menolak (nama sama / wajah sudah berdaftar) — buang
+                            // permohonan tempatan supaya tidak muncul sebagai "menunggu" palsu
+                            if (result && result.success === false) {
+                                DB.pendingMembers = (DB.pendingMembers || []).filter(x => x.id !== data.id);
+                                persistPending();
+                                showToast(result.message || 'Permohonan ditolak — nama ini telahpun berdaftar. Satu nama = satu rekod.', 'error');
+                            }
+                        })
                         .withFailureHandler(function(err) {
                             if (percubaan < 3) {
                                 setTimeout(() => cubaHantar(percubaan + 1), 5000 * percubaan);
@@ -6863,6 +6910,14 @@
             if (!state.currentUser) return;
             const pm = (DB.pendingMembers || []).find(x => x.id === id);
             if (!pm) return;
+            // GUARD: nama ini mungkin sudah jadi pelajar melalui laluan lain semasa
+            // permohonan ini menunggu — jangan cipta rekod kedua untuk nama yang sama
+            const normApp = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            const namaSedia = (DB.students || []).find(s => normApp(s.name) === normApp(pm.name));
+            if (namaSedia) {
+                showToast(`"${pm.name}" sudah wujud sebagai pelajar (${namaSedia.dept || ''} ${namaSedia.semester || ''}). Tolak permohonan ini — dua rekod nama sama membuatkan wajah tidak dapat diimbas.`, 'error');
+                return;
+            }
             const newStudent = {
                 // ID unik walaupun lulus 2 permohonan dalam milisaat sama (klik pantas) —
                 // ID bentrok = descriptor wajah bertindih = salah kenal kekal
@@ -7711,9 +7766,10 @@
                                     cfm.t = nowCf;
                                     confirms.set(f.subject, cfm);
                                     if (cfm.n >= 2 && !inFlight.has(f.subject)) {
+                                        // 10-PERANTI: sama — tulisan tidak menyekat gelung
                                         inFlight.add(f.subject);
-                                        try { await window.markAttendance(f.subject, { confidence: f.similarity, method: 'compreFace' }); }
-                                        finally { setTimeout(() => inFlight.delete(f.subject), 5000); }
+                                        window.markAttendance(f.subject, { confidence: f.similarity, method: 'compreFace' }).catch(() => {});
+                                        setTimeout(() => inFlight.delete(f.subject), 5000);
                                     }
                                 }
                                 window.__cfFrameOk = Date.now(); // tanda pelayan sihat
@@ -7811,13 +7867,12 @@
                             }
 
                             if (isKnown && lulus2Frame && lulusKedip && !inFlight.has(best.label)) {
+                                // 10-PERANTI: tulisan TIDAK menunggu pelayan — gelung imbasan
+                                // terus bergerak walaupun pelayan lambat; dedup pelayan +
+                                // inFlight 5s menghalang pendua bila respons lewat
                                 inFlight.add(best.label);
-                                try {
-                                    await window.markAttendance(best.label, { confidence: Math.max(0, 1 - best.distance), method: 'faceApi' });
-                                } finally {
-                                    // Lepaskan selepas beberapa saat supaya rekod semak duplikasi server masih berfungsi
-                                    setTimeout(() => inFlight.delete(best.label), 5000);
-                                }
+                                window.markAttendance(best.label, { confidence: Math.max(0, 1 - best.distance), method: 'faceApi' }).catch(() => {});
+                                setTimeout(() => inFlight.delete(best.label), 5000);
                             }
                         }
                     } catch (e) {
@@ -8270,8 +8325,11 @@
             const year = state.filterYear, session = state.filterSession;
             // Laporan kehadiran untuk PELAJAR sahaja (staf dikecualikan) — samakan dengan laporan mingguan
             const sessionStudents = window.getAudienceStudents(null, DB.students.filter(s => String(s.year) === String(year) && s.session === session));
-            const attendance = DB.attendance || [];
-            const excused = DB.excusedAbsences || [];
+            // FIX DATA TIDAK TEPAT: hanya rekod pelajar SEBENAR dikira — rekod sisa ujian
+            // (studentId bukan pelajar) tidak menggelembungkan carta kehadiran
+            const rosterRep = new Set(sessionStudents.map(s => String(s.id)));
+            const attendance = (DB.attendance || []).filter(a => rosterRep.has(String(a.studentId)));
+            const excused = (DB.excusedAbsences || []).filter(e => rosterRep.has(String(e.studentId)));
             const todayIso = new Date().toLocaleDateString('en-CA');
 
             let labels = [], hadir = [], tidak = [], bersebab = [], title = '';
@@ -8596,8 +8654,14 @@
             const container = document.getElementById('scan-attendees');
             if (!container) return;
             const programId = state.attendanceProgram;
-            const list = (DB.attendance || []).filter(a => String(a.programId) === String(programId));
+            // Hanya rekod pelajar SEBENAR dikira — sampah sisa ujian tidak muncul
+            const roster = new Set((DB.students || []).filter(s => String(s.year) === String(state.filterYear) && s.session === state.filterSession).map(s => String(s.id)));
+            const list = (DB.attendance || []).filter(a => String(a.programId) === String(programId) && roster.has(String(a.studentId)));
             container.innerHTML = list.map(a => `<div class="flex items-center gap-3 bg-green-50 rounded-xl p-2.5 border border-green-100"><i class="fas fa-check-circle text-green-600"></i><div class="min-w-0"><p class="font-bold text-gray-900 text-sm truncate">${a.name}</p><p class="text-xs text-gray-500">${a.dept} · ${a.time || ''}</p></div></div>`).join('') || '<p class="text-xs text-gray-400 italic">Belum ada rekod kehadiran.</p>';
+            // FIX BUG: kiraan tajuk "Hadir (N)" turut dikemas kini — dahulu tertinggal
+            // angka program LAMA bila operator menukar minggu (paparan bercanggah)
+            const countEl = document.getElementById('scan-attend-count');
+            if (countEl) countEl.textContent = 'Hadir (' + list.length + ')';
         };
 
         // PENDAFTARAN WAJAH PELBAGAI SUDUT: pelajar imbas wajah sendiri melalui kamera
