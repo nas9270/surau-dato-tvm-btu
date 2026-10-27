@@ -2617,6 +2617,7 @@
                                     <span id="member-pose-3" class="flex-1 text-center text-[11px] font-bold px-2 py-1.5 rounded-lg bg-white/20 text-white/80 border border-white/30 transition">Dagu</span>
                                 </div>
                                 <button type="button" onclick="window.memberFaceScan()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera"></i> Mula Imbasan Wajah (Pelbagai Sudut)</button>
+                                <button type="button" onclick="window.tukarKamera()" title="Tukar kamera depan/belakang (smartphone)" class="w-full mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera-rotate"></i> Guna Kamera Belakang</button>
                                 <input type="hidden" id="member-photo-data" value="">
                                 <input type="hidden" id="member-face-data" value="">
                                 <img id="member-photo-preview" class="w-16 h-16 rounded-full object-cover border-2 border-primary-100 mt-3 hidden">
@@ -4973,6 +4974,7 @@
                             <div class="flex gap-3 mt-4">
                                 <button id="btn-start-scan" onclick="window.startFaceScan()" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-play"></i> Mula Imbasan</button>
                                 <button id="btn-stop-scan" onclick="window.stopFaceScan()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-stop"></i> Henti</button>
+                                <button id="btn-cam-switch" onclick="window.tukarKamera()" title="Tukar kamera depan/belakang (smartphone)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-bold text-sm transition flex items-center gap-2 border"><i class="fas fa-camera-rotate"></i> Guna Kamera Belakang</button>
                             </div>
                             <!-- Butang Rekod Manual: wajah gagal dikenali (cahaya/kembar/cermin) tidak memadam kehadiran sesiapa -->
                             <div class="bg-white rounded-2xl border shadow-sm p-4 mt-4">
@@ -5077,6 +5079,7 @@
                                     ${students.map(s => `<option value="${s.id}">${s.name} (${s.dept}) ${enrolledIds.has(String(s.id)) ? '✓' : ''}</option>`).join('')}
                                 </select>
                                 <button onclick="window.captureFace()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera"></i> Daftar Wajah (Imbas Pelbagai Sudut)</button>
+                                <button id="btn-cam-switch" onclick="window.tukarKamera()" title="Tukar kamera depan/belakang (smartphone)" class="w-full mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"><i class="fas fa-camera-rotate"></i> Guna Kamera Belakang</button>
                                 <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i> Pelajar tidak perlu muat naik gambar. Pilih nama pelajar, tekan butang, dan ikut arahan di skrin: hadap depan, pusing sedikit ke kiri, ke kanan, dan angkat dagu — sistem menangkap wajah dari setiap sudut secara automatik. Pastikan pencahayaan baik dan wajah cukup dekat dengan kamera.</p>
                             </div>
                         </div>
@@ -7232,6 +7235,49 @@
             window.markAttendance(sel.value, { confidence: null, method: 'manual-qr' });
         };
 
+        // === PILIHAN KAMERA (depan/belakang) — smartphone ===
+        // 'user' = kamera depan (mirror supaya pergerakan kanan/kiri semula jadi),
+        // 'environment' = kamera belakang (tiada mirror — kamera belakang memang tidak mirror)
+        window.__camFacing = window.__camFacing || 'user';
+
+        // Tukar kamera semasa imbasan/pendaftaran berjalan — stream dibuka semula serta-merta
+        window.tukarKamera = async () => {
+            window.__camFacing = (window.__camFacing === 'user') ? 'environment' : 'user';
+            showToast('Menukar ke kamera ' + (window.__camFacing === 'user' ? 'DEPAN (mirror)' : 'BELAKANG') + '...', 'info');
+            // Hentikan stream semasa (scanInterval kekal hidup — hanya sumber video bertukar)
+            if (faceStream) { faceStream.getTracks().forEach(t => t.stop()); faceStream = null; }
+            // Buka semula pada video yang sama jika paparan aktif
+            const videoId = document.getElementById('scan-video') ? 'scan-video'
+                : document.getElementById('enroll-video') ? 'enroll-video'
+                : document.getElementById('member-face-video') ? 'member-face-video' : null;
+            if (videoId) {
+                try { await getCameraStream(videoId); } catch (e) {
+                    // Sesetengah peranti tiada kamera belakang — kembali ke depan
+                    showToast('Kamera tersebut tiada — kembali ke kamera depan.', 'error');
+                    window.__camFacing = 'user';
+                    try { await getCameraStream(videoId); } catch (e2) {}
+                }
+            }
+            window.__kemasKiniLabelKamera && window.__kemasKiniLabelKamera();
+        };
+
+        // Terapkan CSS mirror pada kamera depan — pergerakan pelajar ke kanan
+        // kelihatan ke kanan di skrin (semula jadi, macam cermin bilik air)
+        window.__terapkanMirror = (videoId) => {
+            const v = document.getElementById(videoId);
+            if (!v) return;
+            v.style.transform = (window.__camFacing === 'user') ? 'scaleX(-1)' : 'none';
+        };
+        // Kemas kini label butang tukar kamera (kalau dipaparkan)
+        window.__kemasKiniLabelKamera = () => {
+            const btn = document.getElementById('btn-cam-switch');
+            if (!btn) return;
+            const depan = window.__camFacing === 'user';
+            btn.innerHTML = depan
+                ? '<i class="fas fa-camera-rotate"></i> Guna Kamera Belakang'
+                : '<i class="fas fa-camera-rotate"></i> Guna Kamera Depan';
+        };
+
         const getCameraStream = async (videoId) => {
             const video = document.getElementById(videoId);
             if (!video) throw new Error('Elemen video tidak ditemui.');
@@ -7250,11 +7296,13 @@
             // Hentikan stream lama
             if (faceStream) { faceStream.getTracks().forEach(t => t.stop()); }
 
-            // Senarai tetapan kamera (cuba satu persatu jika gagal)
+            // Senarai tetapan kamera — ikut pilihan pengguna (depan/belakang),
+            // fallback ke mana-mana kamera jika pilihan tiada pada peranti
+            const muka = window.__camFacing; // 'user' | 'environment'
             const constraintsList = [
-                { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false },
-                { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false },
-                { video: { facingMode: 'user' }, audio: false },
+                { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { ideal: muka } }, audio: false },
+                { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: muka } }, audio: false },
+                { video: { facingMode: { ideal: muka } }, audio: false },
                 { video: true, audio: false }
             ];
 
@@ -7286,7 +7334,10 @@
 
             faceStream = stream;
             video.srcObject = stream;
+            // MIRROR kamera depan — pergerakan kanan/kiri pelajar sepadan di skrin
+            window.__terapkanMirror(videoId);
             try { await video.play(); } catch (e) { /* autoplay mungkin disekat, teruskan */ }
+            window.__kemasKiniLabelKamera && window.__kemasKiniLabelKamera();
             return video;
         };
 
@@ -7504,6 +7555,15 @@
                 const canvas = document.getElementById('scan-overlay');
                 const displaySize = { width: video.videoWidth || 640, height: video.videoHeight || 480 };
                 faceapi.matchDimensions(canvas, displaySize);
+                // OVERLAY CERMIN PINTAR: koordinat pengesanan datang dari video ASAL
+                // (belum cermin). Untuk kamera depan, x_dislay = lebar - x - lebarKotak
+                // supaya kotak kekal atas muka yang sudah di-mirror CSS — dan TEKS label
+                // kekal arah betul (tiada mirror seluruh kanvas).
+                const cerminBox = (b) => {
+                    if (window.__camFacing !== 'user') return b;
+                    const w = displaySize.width || 640;
+                    return { x: w - b.x - b.width, y: b.y, width: b.width, height: b.height };
+                };
 
                 // Peta ID -> nama untuk label kotak yang mesra pengguna (dikongsi kedua-dua laluan)
                 const nameMap = {};
@@ -7572,18 +7632,20 @@
                                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                                 const c = window.getCfConf();
                                 const sc = canvas.width / 640; // skala koordinat CompreFace -> kanvas
+                                // Koordinat x dibalik untuk kamera depan (video di-mirror CSS)
+                                const cfX = (x, w) => (window.__camFacing === 'user') ? (canvas.width - x * sc - w * sc) : x * sc;
                                 for (const f of faces) {
                                     const ok = f.subject && f.similarity >= c.minSimilarity && f.liveness === 1;
                                     const dalamJalur = f.subject && f.similarity >= c.reviewBand && f.similarity < c.minSimilarity;
                                     ctx.strokeStyle = ok ? '#22c55e' : (dalamJalur ? '#f59e0b' : '#ef4444');
                                     ctx.lineWidth = 3;
-                                    ctx.strokeRect(f.box.x * sc, f.box.y * sc, f.box.width * sc, f.box.height * sc);
+                                    ctx.strokeRect(cfX(f.box.x, f.box.width), f.box.y * sc, f.box.width * sc, f.box.height * sc);
                                     ctx.fillStyle = ok ? '#22c55e' : (dalamJalur ? '#f59e0b' : '#ef4444');
                                     ctx.font = 'bold 14px Inter, sans-serif';
                                     const tag = ok
                                         ? ((window.cfNameMap[f.subject] || f.subject) + ' ' + (f.similarity * 100).toFixed(0) + '%')
                                         : (f.liveness !== 1 ? 'FOTO DITOLAK (liveness)' : (dalamJalur ? 'SEM: ' + (window.cfNameMap[f.subject] || f.subject) + ' ' + (f.similarity * 100).toFixed(0) + '%' : 'Tidak dikenali'));
-                                    ctx.fillText(tag, f.box.x * sc, Math.max(14, f.box.y * sc - 6));
+                                    ctx.fillText(tag, cfX(f.box.x, f.box.width), Math.max(14, f.box.y * sc - 6));
                                     if (!f.subject || f.similarity < c.reviewBand || f.liveness !== 1) continue;
                                     if (dalamJalur) { window.tandaSemakanManual(f); continue; } // jalur kelabu: operator sah yang lulus
                                     // kekal pengesahan 2-frame (ArcFace pantas — 2 frame berturut ~0.5-1s)
@@ -7638,14 +7700,14 @@
                                 // Ketinggian mata mesti hampir sama (kepala tidak menoleh jauh ke tepi)
                                 const bezaTinggiMata = Math.abs(mataKiri[0].y - mataKanan[0].y) / lebarMata;
                                 if (sisihan > 0.18 || bezaTinggiMata > 0.15) {
-                                    new faceapi.draw.DrawBox(det.detection.box, { label: 'Sila pandang kamera', boxColor: 'orange' }).draw(canvas);
+                                    new faceapi.draw.DrawBox(cerminBox(det.detection.box), { label: 'Sila pandang kamera', boxColor: 'orange' }).draw(canvas);
                                     window.__scanNota = 'Pandang kamera terus (jangan menoleh)';
                                     continue;
                                 }
                             }
                             // Jika matcher belum sedia (data wajah sedang dijana di latar), lukis kotak sahaja
                             if (!faceMatcher) {
-                                new faceapi.draw.DrawBox(det.detection.box, { label: 'Menyediakan data wajah...', boxColor: 'orange' }).draw(canvas);
+                                new faceapi.draw.DrawBox(cerminBox(det.detection.box), { label: 'Menyediakan data wajah...', boxColor: 'orange' }).draw(canvas);
                                 window.__scanNota = 'Galeri wajah sedang disiapkan...';
                                 continue;
                             }
@@ -7682,7 +7744,7 @@
                             if (!isKnown) { label = 'Tidak dikenali'; warnaKotak = 'red'; window.__scanNota = 'Wajah tiada dalam galeri — daftar dahulu / Rekod Manual'; }
                             else if (!lulus2Frame) { label = (nameMap[best.label] || best.label) + ' — mengesahkan...'; warnaKotak = 'orange'; }
                             else { label = (nameMap[best.label] || best.label) + ' ✓'; warnaKotak = 'green'; }
-                            new faceapi.draw.DrawBox(det.detection.box, { label: label, boxColor: warnaKotak }).draw(canvas);
+                            new faceapi.draw.DrawBox(cerminBox(det.detection.box), { label: label, boxColor: warnaKotak }).draw(canvas);
 
                             // Wajah tidak dikenali → papar mesej gagal + butang Cuba Semula (maksimum sekali setiap 10 saat)
                             if (!isKnown) {
