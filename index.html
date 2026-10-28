@@ -7639,7 +7639,10 @@
                 if (perluDaftar > 0) {
                     showToast(`Menjana data wajah ${perluDaftar} pelajar di latar belakang — imbasan boleh bermula serta-merta.`, 'info');
                     window.autoEnrollFromPhotos((i, total, nama) => {
-                        if (statusEl) statusEl.textContent = `Imbasan aktif · menyediakan wajah ${i}/${total}`;
+                        // FIX STATUS BERBOHONG: auto-daftar latar TIDAK boleh menimbus
+                        // mesej ralat kamera — operator mesti nampak kamera rosak SEGERA
+                        if (window.__scanKameraRosak) return;
+                        if (statusEl && !scanActive) statusEl.textContent = `Menyediakan wajah ${i}/${total}...`;
                         buildFaceMatcher(); // matcher dikemas kini secara beransur
                     }).then(hasil => {
                         buildFaceMatcher();
@@ -7649,7 +7652,21 @@
                 }
 
                 if (!faceMatcher && perluDaftar === 0) { showToast('Tiada wajah berdaftar. Pastikan pelajar ada gambar pendaftaran, atau daftar wajah manual.', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Mula Imbasan'; } return; }
-                const video = await getCameraStream('scan-video');
+                // KAMERA DENGAN AUTO-CUBA-SEMULA: telefon kadang tersentak sekali —
+                // cuba sekali lagi sebelum mengisytiharkan rosak (kegagalan pertama
+                // selalunya sementara: trek belum dilepaskan, sistem sibuk)
+                window.__scanKameraRosak = false;
+                let video = null;
+                for (let cubaKamera = 1; cubaKamera <= 2; cubaKamera++) {
+                    try {
+                        video = await getCameraStream('scan-video');
+                        break;
+                    } catch (e) {
+                        if (cubaKamera === 2) throw e; // dua kali gagal — lapor sebenar
+                        if (statusEl) statusEl.textContent = 'Kamera tersentak — menyambung semula...';
+                        await new Promise(r => setTimeout(r, 1500));
+                    }
+                }
                 // Tunggu sehingga metadata video tersedia (dengan timeout 10 saat)
                 if (video.readyState < 2) {
                     await new Promise((res, rej) => {
@@ -7661,6 +7678,39 @@
                 if (statusEl) statusEl.textContent = 'Imbasan aktif...';
                 showToast('Imbasan kehadiran dimulakan.', 'success');
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Mula Imbasan'; }
+
+                // WATCHDOG KAMERA: trek berakhir (skrin terkunci / tab dihambat /
+                // aplikasi lain merampas) → sambung semula automatik sehingga 3 kali.
+                // Tanpa ini gelung imbasan berputar pada video MATI — tiada rekod,
+                // tiada mesej: punca "kamera ralat, tidak dapat merekod kehadiran".
+                window.__sambungSemulaKiri = 3;
+                const pasangWatchdog = () => {
+                    const trek = faceStream && faceStream.getVideoTracks ? faceStream.getVideoTracks()[0] : null;
+                    if (trek && !trek.__watchdog) {
+                        trek.__watchdog = true;
+                        trek.addEventListener('ended', () => {
+                            if (!scanActive) return;
+                            if (window.__sambungSemulaKiri > 0) {
+                                window.__sambungSemulaKiri--;
+                                const stW = document.getElementById('scan-status');
+                                if (stW) stW.textContent = 'Kamera terputus — menyambung semula...';
+                                getCameraStream('scan-video').then(() => {
+                                    window.__sambungSemulaKiri = 3; // berjaya — reset bajet
+                                    const stW2 = document.getElementById('scan-status');
+                                    if (stW2) stW2.textContent = 'Kamera disambung semula ✓';
+                                    pasangWatchdog();
+                                }).catch(() => {
+                                    if (window.__sambungSemulaKiri === 0) {
+                                        window.__scanKameraRosak = true;
+                                        window.stopFaceScan();
+                                        showToast('Kamera terputus dan gagal disambung — tekan Mula Imbasan semula.', 'error');
+                                    }
+                                });
+                            }
+                        });
+                    }
+                };
+                pasangWatchdog();
 
                 const canvas = document.getElementById('scan-overlay');
                 const displaySize = { width: video.videoWidth || 640, height: video.videoHeight || 480 };
@@ -7743,6 +7793,31 @@
                 let adaWajahBingkaiIni = false;
                 const scanTick = async () => {
                     if (!scanActive) { scanInterval = null; return; }
+                    // SEMAKAN KESIHATAN VIDEO: skrin beku / trek mati tanpa event 'ended'
+                    // (tab dihambat telefon) → sambung semula automatik, bukan berputar kosong
+                    const trekHidup = faceStream && faceStream.getVideoTracks && faceStream.getVideoTracks()[0];
+                    if (!trekHidup || trekHidup.readyState === 'ended' || video.readyState === 0) {
+                        if ((window.__sambungSemulaKiri || 0) > 0) {
+                            window.__sambungSemulaKiri--;
+                            const stS = document.getElementById('scan-status');
+                            if (stS) stS.textContent = 'Kamera tidak aktif — menyambung semula...';
+                            try {
+                                await getCameraStream('scan-video');
+                                window.__sambungSemulaKiri = 3;
+                                const stS2 = document.getElementById('scan-status');
+                                if (stS2) stS2.textContent = 'Kamera disambung semula ✓';
+                            } catch (e) {
+                                if ((window.__sambungSemulaKiri || 0) <= 0) {
+                                    window.__scanKameraRosak = true;
+                                    window.stopFaceScan();
+                                    showToast('Kamera gagal disambung selepas 3 cubaan — tekan Mula Imbasan semula.', 'error');
+                                    return;
+                                }
+                            }
+                        }
+                        scanInterval = setTimeout(scanTick, 1200);
+                        return;
+                    }
                     if (window.__scanBusy) { scanInterval = setTimeout(scanTick, 300); return; } // kitaran sibuk — cuba lagi nanti
                     window.__scanBusy = true;
                     adaWajahBingkaiIni = false;
@@ -7904,7 +7979,10 @@
                 };
                 scanInterval = setTimeout(scanTick, 700); // bingkai pertama laju — kamera sudah sedia
             } catch (e) {
-                if (statusEl) statusEl.textContent = 'Ralat: ' + e.message;
+                // RALAT KAMERA MESTI KELIHATAN & KEBERKALANAN: bendera rosak dipasang supaya
+                // auto-daftar latar tidak menimbus mesej ini (bug "status berbohong")
+                window.__scanKameraRosak = true;
+                if (statusEl) statusEl.textContent = 'RALAT KAMERA: ' + (e.message || e);
                 showToast('Ralat kamera: ' + (e.message || e), 'error');
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Mula Imbasan'; }
             }
