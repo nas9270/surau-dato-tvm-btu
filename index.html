@@ -7446,7 +7446,9 @@
             video.srcObject = stream;
             // MIRROR kamera depan — pergerakan kanan/kiri pelajar sepadan di skrin
             window.__terapkanMirror(videoId);
-            try { await video.play(); } catch (e) { /* autoplay mungkin disekat, teruskan */ }
+            // PENGAWAL play(): janji play() boleh TERGANTUNG SELAMANYA pada stream
+            // tersekat — jangan tunggu kematian; 4 saat cukup, bingkai datang kemudian pun.
+            try { await Promise.race([video.play(), new Promise(r => setTimeout(r, 4000))]); } catch (e) { /* autoplay mungkin disekat, teruskan */ }
             window.__kemasKiniLabelKamera && window.__kemasKiniLabelKamera();
             return video;
         };
@@ -7793,6 +7795,18 @@
                 let adaWajahBingkaiIni = false;
                 const scanTick = async () => {
                     if (!scanActive) { scanInterval = null; return; }
+                    // PENGAWAL KELAYAKAN BINGKAI: jika bingkai sebelum ini tergantung
+                    // (panggilan CF/tf/play tidak kembali) >15 saat → paksa reset.
+                    // Tanpa ini satu janji tergantung membunuh gelung SELAMA-LAMANYA —
+                    // kamera nampak hidup tetapi tiada rekod ditulis.
+                    if (window.__scanBusy) {
+                        if (window.__scanBusyMula && Date.now() - window.__scanBusyMula > 15000) {
+                            window.__scanBusy = false; window.__scanBusyMula = 0;
+                            const stB = document.getElementById('scan-status');
+                            if (stB) stB.textContent = 'Bingkai tergantung — gelung dipulihkan ✓';
+                            showToast('Bingkai imbasan tergantung — gelung dipulihkan automatik.', 'info');
+                        } else { scanInterval = setTimeout(scanTick, 300); return; } // tunggu bingkai selesai
+                    }
                     // SEMAKAN KESIHATAN VIDEO: skrin beku / trek mati tanpa event 'ended'
                     // (tab dihambat telefon) → sambung semula automatik, bukan berputar kosong
                     const trekHidup = faceStream && faceStream.getVideoTracks && faceStream.getVideoTracks()[0];
@@ -7818,8 +7832,8 @@
                         scanInterval = setTimeout(scanTick, 1200);
                         return;
                     }
-                    if (window.__scanBusy) { scanInterval = setTimeout(scanTick, 300); return; } // kitaran sibuk — cuba lagi nanti
                     window.__scanBusy = true;
+                    window.__scanBusyMula = Date.now(); // pemasa pengawal kelayakan 15s
                     adaWajahBingkaiIni = false;
                     try {
                         // ---- laluan imbasan (CompreFace → face-api) ----
@@ -7868,7 +7882,12 @@
                             }
                         }
                         // ===== LALUAN 2: FACE-API.JS (fallback offline / pelayan tidak sihat) =====
-                        const detections = await faceapi.detectAllFaces(video, window.__opsiPengesenImbas())
+                        // ANTI-TYPO: jika fungsi opsi hilang/dieja lain, bina opsi secara
+                        // terus di sini — gelung imbasan TIDAK BOLEH mati kerana nama.
+                        const opsiImbas = (typeof window.__opsiPengesanImbas === 'function')
+                            ? window.__opsiPengesanImbas()
+                            : (ssdModelSedia ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.75 }) : new faceapi.TinyFaceDetectorOptions());
+                        const detections = await faceapi.detectAllFaces(video, opsiImbas)
                             .withFaceLandmarks()
                             .withFaceDescriptors();
                         adaWajahBingkaiIni = detections.length > 0; // kitaran adaptif: wajah hadir → pantas
@@ -7969,6 +7988,7 @@
                     }
                     finally {
                         window.__scanBusy = false;
+                        window.__scanBusyMula = 0;
                         // PAPAN ARAHAN LANGSUNG: sebab sebenar kenapa rekod belum ditulis
                         // dipaparkan setiap bingkai — operator tidak lagi menatap kosong.
                         const stEl = document.getElementById('scan-status');
