@@ -7687,9 +7687,13 @@
             // Senarai tetapan kamera — ikut pilihan pengguna (depan/belakang),
             // fallback ke mana-mana kamera jika pilihan tiada pada peranti
             const muka = window.__camFacing; // 'user' | 'environment'
+            // PILIHAN A: 720p dahulu — dua ganda ketumpatan piksel = pelajar boleh
+            // berdiri ~1.3m (bukan 0.7m) dengan pengawal 110px yang sama. Enjin
+            // pengesanan dikecilkan ke 640 secara dalaman (kos malar) tetapi crop
+            // pengecaman mengambil piksel resolusi penuh — kualiti kekal tinggi.
             const constraintsList = [
-                { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { ideal: muka } }, audio: false },
                 { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: muka } }, audio: false },
+                { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { ideal: muka } }, audio: false }, // peranti lama
                 { video: { facingMode: { ideal: muka } }, audio: false },
                 { video: true, audio: false }
             ];
@@ -8035,6 +8039,10 @@
                 const MATCH_MARGIN = 0.07;        // bingkai pertama — ketat
                 const MATCH_MARGIN_RELAX = 0.05;  // bingkai susulan dalam tetingkap 7s selepas "hampir"
                 const MIN_BOX_PX = 110;
+                // PILIHAN B — zon adaptif: kotak wajah 90–110px (pelajar lebih jauh) dibenarkan
+                // HANYA bila skor padanan ≥0.55 — jarak dibuka tanpa membuka pintu salah-nama.
+                const MIN_BOX_JAUH = 90;
+                const SKOR_JAUH = 0.55;
                 // PADANAN ENJIN-AGNOSTIK — skor NAIK = lebih baik:
                 //   arcface (ArcFace 512-D): skor = kosin [−1..1]; lulus ≥ 0.50; margin 0.10 / 0.06
                 //   dlib (128-D lama):       skor = −jarak;          lulus ≥ −0.38 (jarak ≤ 0.38); margin 0.07 / 0.05
@@ -8177,10 +8185,16 @@
                                 ctxA.fillText(label, box.x, Math.max(14, box.y - 6));
                             };
                             for (const det of muka) {
-                                if (!det.detection || !det.detection.box || det.detection.box.width < MIN_BOX_PX) {
+                                if (!det.detection || !det.detection.box) continue;
+                                const lebarKotak = det.detection.box.width;
+                                // LANTAI MUTLAK 90px — bawah ini descriptor tidak boleh dipercayai langsung
+                                if (lebarKotak < MIN_BOX_JAUH) {
                                     window.__scanNota = 'Mendekati kamera sedikit';
                                     continue;
                                 }
+                                // ZON ADAPTIF (Pilihan B): 90–110px = pelajar lebih jauh; diterima
+                                // kemudian hanya bila skor padanan melampaui SKOR_JAUH (0.55)
+                                const zonAdaptif = lebarKotak < MIN_BOX_PX;
                                 // FRONTAL 5-TITIK: hidung hampir tengah garis mata, mata hampir rata
                                 const kp = det.landmarks5;
                                 const mataTengahX = (kp[0].x + kp[1].x) / 2;
@@ -8207,6 +8221,13 @@
                                         window.__lastScanFail = now;
                                         window.showScanResult(false, best.hampir ? 'Hampir dikenali — kekal menghadap kamera 1-2 saat lagi.' : 'Wajah tidak dikenali. Cuba hadap kamera dengan jelas.');
                                     }
+                                    continue;
+                                }
+                                // PENGAWAL ADAPTIF: wajah 90–110px mesti melebihi 0.55 (lebih yakin
+                                // daripada biasa) — jika tidak, minta pelajar hampiri sedikit
+                                if (zonAdaptif && best.skor < SKOR_JAUH) {
+                                    lukisKotakA(cerminBox(det.detection.box), (nameMap[best.label] || best.label) + ' — skor ' + Math.round(best.skor * 100) + '%, hampiri sedikit', 'orange');
+                                    window.__scanNota = 'Jarak jauh: skor ' + Math.round(best.skor * 100) + '% — hampiri kamera sedikit untuk sahkan';
                                     continue;
                                 }
                                 const labelA = (nameMap[best.label] || best.label) + ' ' + Math.round(best.skor * 100) + '%';
