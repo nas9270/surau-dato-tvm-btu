@@ -6763,6 +6763,17 @@
         window.__humanLoad = async () => {
             if (humanReady) return humanInstance;
             if (typeof Human === 'undefined') throw new Error('Human belum dimuat. Semak sambungan internet.');
+            // Pastikan backend TensorFlow sedia dahulu — pilih yang terbaik mengikut sokongan
+            if (typeof tf !== 'undefined') {
+                try {
+                    if (tf.ready) await tf.ready();
+                    // Cuba WebGPU dahulu (pantas), jatuh ke WebGL jika tiada
+                    if (typeof tf.setBackend === 'function') {
+                        try { await tf.setBackend('webgpu'); } catch (e) { try { await tf.setBackend('webgl'); } catch (e2) { try { await tf.setBackend('cpu'); } catch (e3) {} } }
+                    }
+                    if (tf.ready) await tf.ready();
+                } catch (e) { console.warn('Backend tf:', e); }
+            }
             humanInstance = new Human.default({
                 modelBasePath: HUMAN_MODELS,
                 face: {
