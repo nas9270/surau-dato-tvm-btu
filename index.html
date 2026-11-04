@@ -7376,7 +7376,28 @@
                 await window.insightFace.load();
                 window.__enjinNama = 'arcface';
                 window.__modelsSiap = true;
-                // Enjin dlib dimuat di latar sebagai sandaran masa depan — tidak menyekat imbasan
+                // SAMPEL CERMIN: satu gambar -> dua embedding (asal + cermin) — kepelbagaian
+        // sudut tanpa perlu gambar tambahan. Sampel-tunggal terbukti lemah di lapangan
+        // (rekod Sheet 4 Nov: skor 0.51-0.55 lawan 0.65-0.76 bagi 3-sampel).
+        window.__sampelDariImej = async (img) => {
+            const keluar = [];
+            try {
+                const d1 = await window.__detectSatu(img);
+                if (d1 && d1.descriptor) keluar.push(Array.from(d1.descriptor));
+            } catch (e) {}
+            try {
+                const cv = document.createElement('canvas');
+                cv.width = img.naturalWidth || img.width || 100;
+                cv.height = img.naturalHeight || img.height || 100;
+                const cx = cv.getContext('2d');
+                cx.translate(cv.width, 0); cx.scale(-1, 1); cx.drawImage(img, 0, 0);
+                const d2 = await window.__detectSatu(cv);
+                if (d2 && d2.descriptor) keluar.push(Array.from(d2.descriptor));
+            } catch (e) {}
+            return keluar;
+        };
+
+        // Enjin dlib dimuat di latar sebagai sandaran masa depan — tidak menyekat imbasan
                 window.muatFaceApi().catch(() => {});
                 return;
             } catch (e) {
@@ -7760,9 +7781,9 @@
                 if ((DB.faceDescriptors || []).some(d => String(d.studentId) === String(student.id) && String(d.enjin || 'dlib') === window.__enjinNama)) return;
                 await window.loadFaceModels();
                 const img = await window.__muatImej(student.image);
-                const det = await window.__detectSatu(img);
-                if (det && det.descriptor) {
-                    const rec = { studentId: student.id, name: student.name, dept: student.dept, enjin: window.__enjinNama, descriptor: JSON.stringify([det.descriptor].map(window.__enjinNama === 'arcface' ? packDescI8 : packDesc)) };
+                const sampel = await window.__sampelDariImej(img);
+                if (sampel.length) {
+                    const rec = { studentId: student.id, name: student.name, dept: student.dept, enjin: window.__enjinNama, descriptor: JSON.stringify(sampel.map(window.__enjinNama === 'arcface' ? packDescI8 : packDesc)) };
                     DB.faceDescriptors.push(rec);
                     if (typeof google !== 'undefined' && google.script && google.script.run) {
                         try { google.script.run.saveFaceDescriptor(rec); } catch (e) {}
@@ -7789,9 +7810,9 @@
                 if (onProgress) onProgress(i + 1, targets.length, s.name);
                 try {
                     const img = await window.__muatImej(s.image);
-                    const det = await window.__detectSatu(img);
-                    if (det && det.descriptor) {
-                        const rec = { studentId: s.id, name: s.name, dept: s.dept, enjin: window.__enjinNama, descriptor: JSON.stringify([det.descriptor].map(window.__enjinNama === 'arcface' ? packDescI8 : packDesc)) };
+                    const sampel = await window.__sampelDariImej(img);
+                    if (sampel.length) {
+                        const rec = { studentId: s.id, name: s.name, dept: s.dept, enjin: window.__enjinNama, descriptor: JSON.stringify(sampel.map(window.__enjinNama === 'arcface' ? packDescI8 : packDesc)) };
                         const idx = DB.faceDescriptors.findIndex(d => String(d.studentId) === String(s.id));
                         if (idx !== -1) DB.faceDescriptors[idx] = rec; else DB.faceDescriptors.push(rec);
                         // Simpan ke Sheets (tanpa tunggu)
@@ -8054,14 +8075,18 @@
                 // PILIHAN B — zon adaptif: kotak wajah 90–110px (pelajar lebih jauh) dibenarkan
                 // HANYA bila skor padanan ≥0.55 — jarak dibuka tanpa membuka pintu salah-nama.
                 const MIN_BOX_JAUH = 90;
-                const SKOR_JAUH = 0.55;
+                const SKOR_JAUH = 0.50;
                 // PADANAN ENJIN-AGNOSTIK — skor NAIK = lebih baik:
-                //   arcface (ArcFace 512-D): skor = kosin [−1..1]; lulus ≥ 0.50; margin 0.10 / 0.06
+                //   arcface (ArcFace 512-D): skor = kosin [−1..1]; lulus ≥ 0.45; margin 0.08 / 0.05
                 //   dlib (128-D lama):       skor = −jarak;          lulus ≥ −0.38 (jarak ≤ 0.38); margin 0.07 / 0.05
-                // Penalaan arcface lapangan: salah nama → naikkan 0.52/0.11; terlalu banyak gagal → turunkan 0.48/0.09.
+                // PENALAAN LAPANGAN (data Sheet 4 Nov): rekod berjaya melayang 0.51-0.66 kerana
+                // 61 pendaftaran bersampel-tunggal dari gambar — keyakinan rendah. Ambang diturun
+                // 0.50→0.45 supaya band 0.45-0.49 lulus sementara pendaftaran semula dijalankan
+                // (3 sampel kamera → skor 0.65+). Selepas semua sihat, naikkan semula ke 0.50/0.10.
+                // Salah nama → naikkan; terlalu banyak gagal → turunkan.
                 const matchFace = (desc) => {
                     const GUNA_ARC = window.__enjinNama === 'arcface';
-                    const SKOR_MIN = GUNA_ARC ? 0.50 : -0.38;
+                    const SKOR_MIN = GUNA_ARC ? 0.45 : -0.38;
                     let best = null, bestOther = -Infinity;
                     for (const ld of (faceMatcher.labeledDescriptors || [])) {
                         for (const d of ld.descriptors) {
@@ -8076,7 +8101,7 @@
                     }
                     if (!best || best.skor < SKOR_MIN) return { label: 'unknown' };
                     // MARGIN BERGILIR: tetingkap longgar aktif selepas kegagalan "hampir"
-                    const margin = (Date.now() < (window.__marginRelaxUntil || 0)) ? (GUNA_ARC ? 0.06 : MATCH_MARGIN_RELAX) : (GUNA_ARC ? 0.10 : MATCH_MARGIN);
+                    const margin = (Date.now() < (window.__marginRelaxUntil || 0)) ? (GUNA_ARC ? 0.05 : MATCH_MARGIN_RELAX) : (GUNA_ARC ? 0.08 : MATCH_MARGIN);
                     if (best.skor - bestOther < margin) {
                         // skor LULUS tapi margin gagal = "hampir" — buka tetingkap 7s
                         window.__marginRelaxUntil = Date.now() + 7000;
